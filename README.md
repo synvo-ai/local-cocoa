@@ -19,7 +19,7 @@
 🧠 Each file turns into memory. Memories form context.
 Context sparks insight. Insight powers action.
 
-🔒 No externals eyes. No data leaving. Just your computer learning you better, helping you smarter.
+🔒 No external eyes. No data leaving. Just your computer learning you better, helping you smarter.
 
 ### 🎬 Live Demos
 
@@ -27,7 +27,7 @@ Context sparks insight. Insight powers action.
 
 | 🔍 **File Retrieval** | 📊 **Year-End Report** | ⌨️ **Global Shortcuts** |
 | :---: | :---: | :---: |
-| <a href="#"><img src="https://placehold.co/600x400/202020/FFFFFF/png?text=Coming+Soon" width="100%" alt="Retrieval Demo"></a> | <a href="#"><img src="https://placehold.co/600x400/202020/FFFFFF/png?text=Coming+Soon" width="100%" alt="Report Demo"></a> | <a href="#"><img src="https://placehold.co/600x400/202020/FFFFFF/png?text=Coming+Soon" width="100%" alt="Shortcut Demo"></a> |
+| <video src="https://github.com/user-attachments/assets/f3e60c7b-9f32-4507-a02b-b52a1fdb0b40" width="300" controls></video> | <video src="https://github.com/user-attachments/assets/57902642-e042-47c2-89d4-b6dc0b0a71ad" width="300" controls></video> | <video src="https://github.com/user-attachments/assets/63c1634a-bb93-443d-ad12-2ce0c631a3b6" width="300" controls></video> |
 | *Instantly chat with your local files* | *Scan 2025 files for insights* | *Access Synvo anywhere* |
 
 </div>
@@ -216,9 +216,9 @@ We’re also building toward **portable trusted memory** — letting users and A
 
 ### 🌍 Community Contributors
 
-<a href="https://github.com/synvo-ai/local-cocoa/graphs/contributors">
+<!-- <a href="https://github.com/synvo-ai/local-cocoa/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=synvo-ai/local-cocoa" />
-</a>
+</a> -->
 
 ## 🤝 Contributing
 
