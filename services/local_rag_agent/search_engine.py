@@ -612,26 +612,15 @@ class SearchEngine:
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": payload.query}
             ]
-            logger.info("=" * 80)
-            logger.info(f"🤖 DIRECT MODE (search_mode={search_mode}, mode={payload.mode})")
-            logger.info("=" * 80)
-            logger.info(f"\n📝 User Query: {payload.query}")
-            logger.info("=" * 80)
+            logger.info(f"🤖 DIRECT MODE (search_mode={search_mode}, mode={payload.mode}), query_len={len(payload.query)}")
+            logger.debug(f"📝 User Query: {payload.query}")
             try:
                 completion = await self.llm_client.chat_complete(messages, max_tokens=1024)
-                logger.info("=" * 80)
-                logger.info("✅ MODEL OUTPUT (DIRECT MODE)")
-                logger.info("=" * 80)
-                logger.info(f"\n📤 Model Response ({len(completion)} characters):")
-                logger.info(completion)
-                logger.info("=" * 80)
+                logger.info(f"✅ DIRECT MODE response_len={len(completion)}")
+                logger.debug(f"📤 Model Response: {completion}")
             except Exception as e:
                 logger.error(f"Chat completion failed: {e}")
                 completion = "Unable to contact the language model service."
-                logger.info("=" * 80)
-                logger.info("❌ MODEL OUTPUT (DIRECT MODE) - ERROR")
-                logger.info(f"Error message: {str(e)}")
-                logger.info("=" * 80)
 
             return QaResponse(
                 answer=completion.strip(),
@@ -661,27 +650,14 @@ class SearchEngine:
                 diagnostics=diagnostics,
             )
 
-        logger.info("=" * 80)
-        logger.info("📝 Retrieved chunks for QA:")
-        logger.info(f"Query: {payload.query}")
-        logger.info("-" * 80)
-
-        # Log all retrieved chunks for visibility
+        logger.info(f"📝 Retrieved {len(hits)} chunks for QA, query_len={len(payload.query)}")
+        logger.debug(f"Query: {payload.query}")
         for idx, hit in enumerate(hits, 1):
             chunk_text = self._chunk_text(hit)
             snippet = chunk_text or hit.snippet or hit.summary
             if not snippet:
                 continue
-            source = hit.metadata.get("path") if hit.metadata else None
-            label = source or hit.file_id
-
-            logger.info(f"\n[Chunk {idx}] Score: {hit.score:.3f}")
-            logger.info(f"Source: {label}")
-            if hit.metadata and hit.metadata.get("segment_index") is not None:
-                logger.info(f"Segment: #{hit.metadata['segment_index']}")
-            logger.info(f"Content: {snippet[:500]}{'...' if len(snippet) > 500 else ''}")
-
-        logger.info("=" * 80)
+            logger.debug(f"[Chunk {idx}] Score: {hit.score:.3f}, file_id={hit.file_id}, snippet_len={len(snippet)}")
 
         # Use the TOP chunk for answering - limit context to prevent VLM repetition issues
         context_parts: List[str] = []
@@ -722,12 +698,12 @@ class SearchEngine:
                 # Add citation info based on file type
                 citation = ""
                 if hit.metadata:
-                    logger.info(f"🔍 Processing hit metadata: {hit.metadata}")
+                    logger.debug(f"🔍 Processing hit metadata: {hit.metadata}")
                     kind = hit.metadata.get("kind", "").lower()
                     page_start = hit.metadata.get("page_start")
                     page_end = hit.metadata.get("page_end")
                     page_numbers = hit.metadata.get("page_numbers")
-                    logger.info(f"📄 File type: {kind}, page_start: {page_start}, page_end: {page_end}, page_numbers: {page_numbers}")
+                    logger.debug(f"📄 File type: {kind}, page_start: {page_start}, page_end: {page_end}, page_numbers: {page_numbers}")
 
                     # PDFs and documents - show page numbers
                     if page_start and page_end:
@@ -750,7 +726,7 @@ class SearchEngine:
                             if time_match:
                                 citation = f", {time_match.group(1)}-{time_match.group(2)}"
 
-                logger.info(f"✅ Final citation: '{citation}' for {label}")
+                logger.debug(f"✅ Final citation: '{citation}' for {label}")
                 context_parts.append(f"{label}{citation}\n{snippet[:max_snippet_len]}")
 
         # If still no context, use file names as fallback
@@ -763,7 +739,6 @@ class SearchEngine:
         logger.info(f"📤 Sending top {len(context_parts)} chunks to LLM ({len(context)} chars)")
         if not context:
             logger.warning("⚠️  WARNING: Empty context! Using hits info as fallback")
-        logger.info("=" * 80)
 
         # Use chat API for better VLM responses
         # Check if this was a multi-path query for specialized prompting
@@ -809,54 +784,21 @@ class SearchEngine:
             {"role": "user", "content": user_message}
         ]
 
-        logger.info("=" * 80)
-        logger.info("🤖 FULL MODEL INPUT - START")
-        logger.info("=" * 80)
-        logger.info(f"\n📝 User Query: {payload.query}")
-        if is_multi_path:
-            logger.info(f"\n🔀 Multi-path query with {len(search.sub_queries)} sub-queries:")
-            for sq in search.sub_queries:
-                logger.info(f"   - {sq}")
-        logger.info(f"\n📊 Retrieved {len(hits)} chunks, using top {len(context_parts)} for context")
-        logger.info(f"\n📄 Context length: {len(context)} characters")
-        logger.info("\n" + "=" * 80)
-        logger.info("📋 SYSTEM MESSAGE:")
-        logger.info("=" * 80)
-        logger.info(system_message)
-        logger.info("\n" + "=" * 80)
-        logger.info("💬 USER MESSAGE:")
-        logger.info("=" * 80)
-        logger.info(user_message)
-        logger.info("\n" + "=" * 80)
-        logger.info("📨 COMPLETE MESSAGES ARRAY (JSON):")
-        logger.info("=" * 80)
-        logger.info(json.dumps(messages, indent=2, ensure_ascii=False))
-        logger.info("\n" + "=" * 80)
-        logger.info("🤖 FULL MODEL INPUT - END")
-        logger.info("=" * 80)
+        sub_query_count = len(search.sub_queries) if is_multi_path else 0
+        logger.info(f"🤖 LLM request: hits={len(hits)}, context_len={len(context)}, multi_path={is_multi_path}, sub_queries={sub_query_count}")
+        logger.debug(f"📝 User Query: {payload.query}")
+        logger.debug(f"📨 Messages: {json.dumps(messages, indent=2, ensure_ascii=False)}")
         try:
             completion = await self.llm_client.chat_complete(
                 messages,
-                max_tokens=1024,  # Shorter to force conciseness
+                max_tokens=1024,
                 repeat_penalty=1.2,
             )
-            logger.info("=" * 80)
-            logger.info("✅ MODEL OUTPUT - START")
-            logger.info("=" * 80)
-            logger.info(f"\n📤 Model Response ({len(completion)} characters):")
-            logger.info("=" * 80)
-            logger.info(completion)
-            logger.info("\n" + "=" * 80)
-            logger.info("✅ MODEL OUTPUT - END")
-            logger.info("=" * 80)
+            logger.info(f"✅ LLM response_len={len(completion)}")
+            logger.debug(f"📤 Model Response: {completion}")
         except Exception as e:
             logger.error(f"Chat completion failed: {e}")
             completion = "Unable to contact the language model service."
-            logger.info("=" * 80)
-            logger.info("❌ MODEL OUTPUT - ERROR")
-            logger.info("=" * 80)
-            logger.info(f"Error message: {str(e)}")
-            logger.info("=" * 80)
         if is_multi_path:
             diagnostics_steps.add(
                 id="answer",
