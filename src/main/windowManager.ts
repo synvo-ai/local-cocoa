@@ -55,8 +55,7 @@ export class WindowManager {
                 preload: config.paths.preload,
                 contextIsolation: true,
                 nodeIntegration: false,
-                sandbox: false,
-                webSecurity: false
+                sandbox: true
             }
         });
 
@@ -77,7 +76,16 @@ export class WindowManager {
         });
 
         this.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-            shell.openExternal(url).catch((err) => console.error('Failed to open external url:', err));
+            try {
+                const parsed = new URL(url);
+                if (['https:', 'http:', 'mailto:'].includes(parsed.protocol)) {
+                    shell.openExternal(url).catch((err) => console.error('Failed to open external url:', err));
+                } else {
+                    console.warn(`Blocked openExternal for unsafe protocol: ${parsed.protocol}`);
+                }
+            } catch (e) {
+                console.error('Invalid URL for openExternal:', url);
+            }
             return { action: 'deny' };
         });
 
@@ -124,7 +132,7 @@ export class WindowManager {
                 preload: config.paths.preload,
                 contextIsolation: true,
                 nodeIntegration: false,
-                sandbox: false
+                sandbox: true
             }
         });
 
@@ -231,7 +239,7 @@ export class WindowManager {
                 preload: config.paths.preload,
                 contextIsolation: true,
                 nodeIntegration: false,
-                sandbox: false
+                sandbox: true
             }
         });
 

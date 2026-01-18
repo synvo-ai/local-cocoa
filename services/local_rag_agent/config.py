@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import logging
+import logging.handlers
 import platform
 from functools import lru_cache
 from pathlib import Path
@@ -219,16 +220,21 @@ logging.basicConfig(
 )
 
 if (os.getenv("LOCAL_AGENT_LOG_PATH")):
-    # Use the path as-is if explicitly set (dev mode uses relative paths, prod uses absolute)
-    # This respects both development and production configurations
     log_path = os.getenv("LOCAL_AGENT_LOG_PATH")
-    log_dir = os.path.dirname(log_path)
-    
-    if log_dir:
-        try:
-            os.makedirs(log_dir, exist_ok=True)
-            file_handler = logging.FileHandler(log_path, encoding="utf-8")
-            logging.getLogger().addHandler(file_handler)
-        except OSError as e:
-            # If we can't create the log directory (e.g., read-only filesystem), just skip file logging
-            logging.getLogger(__name__).warning(f"Could not create log directory {log_dir}: {e}. File logging disabled.")
+    if log_path:
+        log_dir = os.path.dirname(log_path)
+        if log_dir:
+            try:
+                os.makedirs(log_dir, exist_ok=True)
+                file_handler = logging.handlers.RotatingFileHandler(
+                    log_path,
+                    maxBytes=10 * 1024 * 1024,
+                    backupCount=3,
+                    encoding="utf-8"
+                )
+                file_handler.setFormatter(logging.Formatter(
+                    '[local_agent]%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+                ))
+                logging.getLogger().addHandler(file_handler)
+            except OSError as e:
+                logging.getLogger(__name__).warning(f"Could not create log directory {log_dir}: {e}. File logging disabled.")

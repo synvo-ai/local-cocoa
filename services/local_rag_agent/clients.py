@@ -199,7 +199,8 @@ class LlmClient:
             endpoints.append(f"{base}/v1/completions")
 
         errors: list[str] = []
-        logger.info(f"🔧 LLM Request payload: {payload}")
+        logger.info(f"🔧 LLM Request: max_tokens={payload.get('max_tokens')}")
+        logger.debug(f"🔧 LLM Request payload: {payload}")
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             for endpoint in endpoints:
                 try:
@@ -310,7 +311,8 @@ class LlmClient:
         ]
 
         errors: list[str] = []
-        logger.info(f"🔧 Chat Request payload: {payload}")
+        logger.info(f"🔧 Chat Request: messages={len(messages)}, max_tokens={max_tokens}")
+        logger.debug(f"🔧 Chat Request payload: {payload}")
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             for endpoint in endpoints:
                 try:
@@ -705,7 +707,7 @@ class LlmClient:
             f"{base}/chat/completions",
         ]
 
-        logger.info(f"🔧 Stream Chat Request: {len(messages)} messages, max_tokens={max_tokens}")
+        logger.info(f"🔧 Stream Chat Request: messages={len(messages)}, max_tokens={max_tokens}")
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             for endpoint in endpoints:

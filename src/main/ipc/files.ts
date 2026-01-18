@@ -1,5 +1,6 @@
-import { ipcMain, dialog, shell } from 'electron';
+import { ipcMain, dialog, shell, app } from 'electron';
 import fs from 'fs';
+import path from 'path';
 import {
     listFolders,
     addFolder,
@@ -21,6 +22,28 @@ import {
     getChunkHighlightPngBase64,
 } from '../backendClient';
 import { WindowManager } from '../windowManager';
+
+const ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.ico'];
+
+async function isPathInIndexedFolders(targetPath: string): Promise<boolean> {
+    try {
+        const folders = await listFolders();
+        const resolvedTarget = path.resolve(targetPath);
+        for (const folder of folders) {
+            const resolvedFolder = path.resolve(folder.path);
+            if (resolvedTarget.startsWith(resolvedFolder + path.sep) || resolvedTarget === resolvedFolder) {
+                return true;
+            }
+        }
+        const userData = app.getPath('userData');
+        if (resolvedTarget.startsWith(userData + path.sep)) {
+            return true;
+        }
+        return false;
+    } catch {
+        return false;
+    }
+}
 
 export function registerFileHandlers(windowManager: WindowManager) {
     ipcMain.handle('folders:pick', async () => {
@@ -109,6 +132,11 @@ export function registerFileHandlers(windowManager: WindowManager) {
             throw new Error('Missing file path.');
         }
 
+        const isAllowed = await isPathInIndexedFolders(targetPath);
+        if (!isAllowed) {
+            throw new Error('Access denied: path is outside indexed folders.');
+        }
+
         const result = await shell.openPath(targetPath);
         if (result) {
             throw new Error(result);
@@ -129,6 +157,17 @@ export function registerFileHandlers(windowManager: WindowManager) {
         if (!payload?.filePath) {
             throw new Error('Missing file path.');
         }
+
+        const ext = path.extname(payload.filePath).toLowerCase();
+        if (!ALLOWED_IMAGE_EXTENSIONS.includes(ext)) {
+            throw new Error(`Access denied: file type "${ext}" is not an allowed image format.`);
+        }
+
+        const isAllowed = await isPathInIndexedFolders(payload.filePath);
+        if (!isAllowed) {
+            throw new Error('Access denied: path is outside indexed folders.');
+        }
+
         try {
             const buffer = await fs.promises.readFile(payload.filePath);
             return buffer.toString('base64');

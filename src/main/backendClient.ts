@@ -79,7 +79,7 @@ function getLocalKey(): string | null {
             const key = fs.readFileSync(keyPath, 'utf-8').trim();
             if (key) {
                 cachedKey = key;
-                console.log('[BackendClient] API key loaded successfully from:', keyPath);
+                console.log('[BackendClient] API key loaded successfully.');
                 return cachedKey;
             }
         } else {
@@ -114,10 +114,6 @@ async function requestJson<T>(endpoint: string, init?: RequestInit): Promise<T> 
     const key = getLocalKey();
     if (key) {
         headers.set('X-API-Key', key);
-        // Debug: only log first 20 chars of key for security
-        if (endpoint === '/health') {
-            console.log(`[BackendClient] Using API key: ${key.substring(0, 20)}...`);
-        }
     } else {
         console.warn('[BackendClient] No API key available for request to:', endpoint);
     }
