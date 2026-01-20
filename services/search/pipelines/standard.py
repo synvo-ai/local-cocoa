@@ -4,7 +4,7 @@ import time
 from typing import Any, Dict, List, Callable, AsyncGenerator, TYPE_CHECKING
 from services.core.config import settings
 from services.search.types import EmbeddingUnavailableError
-
+from services.vlm.service import VisionProcessor
 if TYPE_CHECKING:
     from services.search.engine import SearchEngine
     from services.search.components.verification import VerificationComponent
@@ -15,6 +15,7 @@ class StandardPipeline:
     def __init__(self, engine: 'SearchEngine', verification: 'VerificationComponent'):
         self.engine = engine
         self.verification = verification
+        self.vlm = VisionProcessor(engine.llm_client)
 
     async def _process_hits_generator(
         self,
@@ -60,12 +61,23 @@ class StandardPipeline:
              chunk_text = self.engine._chunk_text(hit)
              
              kind = hit.metadata.get("kind") if hit.metadata else None
+             source = hit.metadata.get("source") if hit.metadata else None
              if kind == "image":
                 parts = []
                 if hit.summary: parts.append(f"[Image Description]: {hit.summary}")
                 if chunk_text: parts.append(f"[Image Text]: {chunk_text}")
                 snippet = "\n".join(parts)
                 if not snippet: snippet = hit.snippet
+             elif source == "pdf_vision":
+                path = hit.metadata.get("path") if hit.metadata else None
+                chunk_id = hit.chunk_id
+                chunk = self.engine.storage.get_chunk(chunk_id)
+                page_numbers = chunk.metadata.get("page_numbers")
+                images = await self.vlm.pdf_to_images(path)
+                images = list(images.values())
+                images_ = [images[i-1] for i in page_numbers]
+                images_ = b"".join(images)
+                snippet = await self.vlm._describe_image(images_, "Describe this image")
              else:
                 snippet = chunk_text or hit.snippet or hit.summary
 
