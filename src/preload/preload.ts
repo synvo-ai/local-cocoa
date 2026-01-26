@@ -52,8 +52,6 @@ const api = {
     removeFolder: (folderId: string): Promise<{ id: string }> =>
         ipcRenderer.invoke('folders:remove', folderId),
     getLocalKey: (): Promise<string> => ipcRenderer.invoke('auth:get-local-key'),
-    setLocalKeyOverride: (key: string | null): Promise<boolean> =>
-        ipcRenderer.invoke('auth:set-local-key', key),
     runIndex: (options?: RunIndexOptions): Promise<IndexProgressUpdate> =>
         ipcRenderer.invoke('index:run', options ?? {}),
     indexFolder: (folderId: string): Promise<IndexProgressUpdate> =>
@@ -64,23 +62,23 @@ const api = {
     indexSummary: (): Promise<IndexSummary> => ipcRenderer.invoke('index:summary'),
     pauseIndexing: (): Promise<IndexProgressUpdate> => ipcRenderer.invoke('index:pause'),
     resumeIndexing: (): Promise<IndexProgressUpdate> => ipcRenderer.invoke('index:resume'),
-    
+
     // Staged indexing (two-round progressive system)
-    stageProgress: (folderId?: string): Promise<any> => 
+    stageProgress: (folderId?: string): Promise<any> =>
         ipcRenderer.invoke('index:stage-progress', folderId),
-    startSemanticIndexing: (): Promise<any> => 
+    startSemanticIndexing: (): Promise<any> =>
         ipcRenderer.invoke('index:start-semantic'),
-    stopSemanticIndexing: (): Promise<any> => 
+    stopSemanticIndexing: (): Promise<any> =>
         ipcRenderer.invoke('index:stop-semantic'),
-    startDeepIndexing: (): Promise<any> => 
+    startDeepIndexing: (): Promise<any> =>
         ipcRenderer.invoke('index:start-deep'),
-    stopDeepIndexing: (): Promise<any> => 
+    stopDeepIndexing: (): Promise<any> =>
         ipcRenderer.invoke('index:stop-deep'),
-    deepStatus: (): Promise<any> => 
+    deepStatus: (): Promise<any> =>
         ipcRenderer.invoke('index:deep-status'),
     runStagedIndex: (options?: { folders?: string[]; files?: string[]; mode?: 'rescan' | 'reindex' }): Promise<IndexProgressUpdate> =>
         ipcRenderer.invoke('index:run-staged', options),
-    
+
     indexInventory: (options?: { folderId?: string; limit?: number; offset?: number }): Promise<IndexInventory> =>
         ipcRenderer.invoke('index:list', options ?? {}),
     listFiles: (limit?: number, offset?: number): Promise<FileListResponse> =>
@@ -237,7 +235,7 @@ const api = {
         onData: (chunk: string) => void;
         onError: (error: string) => void;
         onDone: () => void;
-    }, searchMode?: 'auto' | 'knowledge' | 'direct', resumeToken?: string): () => void => {
+    }, searchMode?: 'auto' | 'knowledge' | 'direct', resumeToken?: string, useVisionForAnswer?: boolean): () => void => {
         const dataChannel = 'qa:stream-data';
         const errorChannel = 'qa:stream-error';
         const doneChannel = 'qa:stream-done';
@@ -250,7 +248,7 @@ const api = {
         ipcRenderer.on(errorChannel, onError);
         ipcRenderer.on(doneChannel, onDone);
 
-        ipcRenderer.send('qa:ask-stream', { query, limit, mode, searchMode, resumeToken });
+        ipcRenderer.send('qa:ask-stream', { query, limit, mode, searchMode, resumeToken, useVisionForAnswer });
 
         return () => {
             ipcRenderer.removeListener(dataChannel, onData);
@@ -417,6 +415,17 @@ const api = {
         isActive: boolean;
     }[]> => ipcRenderer.invoke('mcp:list-connections'),
 
+    onMCPActivity: (callback: (activity: any) => void) => {
+        const channel = 'mcp:activity';
+        const listener = (_event: unknown, data: any) => callback(data);
+        ipcRenderer.on(channel, listener);
+        return () => {
+            ipcRenderer.removeListener(channel, listener);
+        };
+    },
+
+    closeMCPWindow: (): void => ipcRenderer.send('mcp:close-window'),
+
     // Create a new connection for an external app
     mcpCreateConnection: (name: string): Promise<{
         success: boolean;
@@ -453,23 +462,23 @@ const api = {
     // ========================================
     // Plugin System APIs
     // ========================================
-    
+
     // List all installed plugins
     listPlugins: (): Promise<any[]> =>
         ipcRenderer.invoke('plugins:list'),
-    
+
     // Get UI entries from plugins
     getPluginUIEntries: (): Promise<any[]> =>
         ipcRenderer.invoke('plugins:ui-entries'),
-    
+
     // Get plugins configuration
     getPluginsConfig: (): Promise<any> =>
         ipcRenderer.invoke('plugins:get-config'),
-    
+
     // Get plugin manifests with user config
     getPluginManifests: (): Promise<any[]> =>
         ipcRenderer.invoke('plugins:get-manifests'),
-    
+
     // Get enabled plugin tabs for Extensions view
     getEnabledPluginTabs: (): Promise<Array<{
         id: string;
@@ -478,51 +487,51 @@ const api = {
         icon: string;
         component?: string;
     }>> => ipcRenderer.invoke('plugins:get-enabled-tabs'),
-    
+
     // Set plugin enabled state
     setPluginEnabled: (pluginId: string, enabled: boolean): Promise<{ success: boolean; config?: any; error?: string }> =>
         ipcRenderer.invoke('plugins:set-enabled', pluginId, enabled),
-    
+
     // Reorder plugins
     reorderPlugins: (newOrder: string[]): Promise<{ success: boolean; config?: any; error?: string }> =>
         ipcRenderer.invoke('plugins:reorder', newOrder),
-    
+
     // Reset plugins config to defaults
     resetPluginsConfig: (): Promise<{ success: boolean; config?: any }> =>
         ipcRenderer.invoke('plugins:reset-config'),
-    
+
     // Install a plugin from file
     installPlugin: (zipPath: string): Promise<{ success: boolean; pluginId?: string; error?: string }> =>
         ipcRenderer.invoke('plugins:install', zipPath),
-    
+
     // Uninstall a plugin
     uninstallPlugin: (pluginId: string): Promise<{ success: boolean; error?: string }> =>
         ipcRenderer.invoke('plugins:uninstall', pluginId),
-    
+
     // Enable/disable a plugin (legacy - use setPluginEnabled instead)
     togglePlugin: (pluginId: string, enabled: boolean): Promise<boolean> =>
         ipcRenderer.invoke('plugins:toggle', pluginId, enabled),
-    
+
     // Hot reload a plugin (unload and reload without app restart)
     reloadPlugin: (pluginId: string): Promise<boolean> =>
         ipcRenderer.invoke('plugins:reload', pluginId),
-    
+
     // Refresh all plugins (rediscover and reload)
     refreshPlugins: (): Promise<boolean> =>
         ipcRenderer.invoke('plugins:refresh'),
-    
+
     // Get frontend URL for a plugin
     getPluginFrontendUrl: (pluginId: string): Promise<string | null> =>
         ipcRenderer.invoke('plugins:get-frontend-url', pluginId),
-    
+
     // Pick a plugin file for installation
     pickPluginFile: (): Promise<string | null> =>
-        ipcRenderer.invoke('files:pick-one', { 
-            filters: [{ name: 'Synvo Plugin', extensions: ['synvo-plugin', 'zip'] }] 
+        ipcRenderer.invoke('files:pick-one', {
+            filters: [{ name: 'Synvo Plugin', extensions: ['synvo-plugin', 'zip'] }]
         }),
-    
+
     // Listen for plugin events
-    onPluginEvent: (callback: (event: { type: string; pluginId: string; [key: string]: any }) => void): (() => void) => {
+    onPluginEvent: (callback: (event: { type: string; pluginId: string;[key: string]: any }) => void): (() => void) => {
         const channel = 'plugin:event';
         const listener = (_event: unknown, payload: any) => callback(payload);
         ipcRenderer.on(channel, listener);
@@ -530,7 +539,7 @@ const api = {
             ipcRenderer.removeListener(channel, listener);
         };
     },
-    
+
     // Listen for plugin updates (hot reload notifications)
     onPluginsUpdated: (callback: () => void): (() => void) => {
         const channel = 'plugins:updated';
@@ -540,7 +549,7 @@ const api = {
             ipcRenderer.removeListener(channel, listener);
         };
     },
-    
+
     // Listen for plugins config updates
     onPluginsConfigUpdated: (callback: (config: any) => void): (() => void) => {
         const channel = 'plugins:config-updated';
@@ -550,7 +559,7 @@ const api = {
             ipcRenderer.removeListener(channel, listener);
         };
     },
-    
+
     // Listen for plugin notifications
     onPluginNotification: (callback: (notification: { pluginId: string; message: string; options?: { type?: string } }) => void): (() => void) => {
         const channel = 'plugin:notification';
@@ -580,6 +589,161 @@ const api = {
     // Get foresights
     memoryGetForesights: (userId: string, limit?: number): Promise<any[]> =>
         ipcRenderer.invoke('memory:foresights', { userId, limit }),
+
+    // Get memcells
+    memoryGetMemcells: (userId: string, limit?: number, offset?: number): Promise<any[]> =>
+        ipcRenderer.invoke('memory:memcells', { userId, limit, offset }),
+
+    // Get memcell detail
+    memoryGetMemcellDetail: (memcellId: string): Promise<any> =>
+        ipcRenderer.invoke('memory:memcell-detail', { memcellId }),
+
+    // Get memcells by file
+    memoryGetMemcellsByFile: (fileId: string, limit?: number): Promise<any[]> =>
+        ipcRenderer.invoke('memory:memcells-by-file', { fileId, limit }),
+
+    // Get LLM-inferred basic profile from system data (hierarchical structure)
+    memoryGetBasicProfile: (userId: string): Promise<{
+        user_id: string;
+        user_name?: string;
+        // Hierarchical topics
+        topics: Array<{
+            topic_id: string;
+            topic_name: string;
+            icon?: string;
+            subtopics: Array<{
+                name: string;
+                description?: string;
+                value?: any;
+                confidence?: string;  // high, medium, low
+                evidence?: string;
+            }>;
+        }>;
+        // Legacy flat fields (backward compatibility)
+        personality: string[];
+        interests: string[];
+        hard_skills: Array<{ name: string; level?: string }>;
+        soft_skills: Array<{ name: string; level?: string }>;
+        working_habit_preference: string[];
+        user_goal: string[];
+        motivation_system: string[];
+        value_system: string[];
+        inferred_roles: string[];
+        raw_system_data?: {
+            username: string;
+            computer_name: string;
+            shell: string;
+            language: string;
+            region: string;
+            timezone: string;
+            appearance: string;
+            installed_apps: string[];
+            dev_tools: Array<{ name: string; version: string }>;
+        };
+        scanned_at: string;
+    }> => ipcRenderer.invoke('memory:basic-profile', { userId }),
+
+    // Get cached basic profile (without regenerating, returns null if not found)
+    memoryGetCachedBasicProfile: (userId: string): Promise<{
+        user_id: string;
+        user_name?: string;
+        topics: Array<{
+            topic_id: string;
+            topic_name: string;
+            icon?: string;
+            subtopics: Array<{
+                name: string;
+                value?: any;
+                confidence?: string;
+                evidence?: string;
+            }>;
+        }>;
+        raw_system_data?: {
+            username: string;
+            computer_name: string;
+            shell: string;
+            language: string;
+            region: string;
+            timezone: string;
+            appearance: string;
+            installed_apps: string[];
+            dev_tools: Array<{ name: string; version: string }>;
+        };
+        scanned_at: string;
+    } | null> => ipcRenderer.invoke('memory:basic-profile-cached', { userId }),
+
+    // Stream basic profile generation progressively
+    // Returns cleanup function to stop listening
+    memoryStreamBasicProfile: (
+        userId: string,
+        onEvent: (event: {
+            type: 'init' | 'topic' | 'complete' | 'error';
+            data: any;
+        }) => void
+    ): (() => void) => {
+        // Set up event listeners
+        const eventHandler = (_: any, eventData: any) => {
+            onEvent(eventData);
+        };
+        const endHandler = () => {
+            // Cleanup listeners when stream ends
+            ipcRenderer.removeListener('memory:basic-profile-stream-event', eventHandler);
+            ipcRenderer.removeListener('memory:basic-profile-stream-end', endHandler);
+        };
+
+        ipcRenderer.on('memory:basic-profile-stream-event', eventHandler);
+        ipcRenderer.on('memory:basic-profile-stream-end', endHandler);
+
+        // Start the stream
+        ipcRenderer.send('memory:basic-profile-stream-start', { userId });
+
+        // Return cleanup function
+        return () => {
+            ipcRenderer.removeListener('memory:basic-profile-stream-event', eventHandler);
+            ipcRenderer.removeListener('memory:basic-profile-stream-end', endHandler);
+            ipcRenderer.send('memory:basic-profile-stream-cancel');
+        };
+    },
+
+    // Manually extract memory for a file
+    // force: If true, re-extract all chunks (no resume / 不支持断点续传)
+    // chunkSize: Custom chunk size in chars. If set, concatenates all text and re-chunks (no resume)
+    memoryExtractForFile: (fileId: string, userId?: string, force?: boolean, chunkSize?: number): Promise<{
+        success: boolean;
+        fileId: string;
+        message: string;
+        memcellsCreated: number;
+        episodesCreated: number;
+        eventLogsCreated: number;
+        foresightsCreated: number;
+    }> => ipcRenderer.invoke('memory:extract', { fileId, userId, force, chunkSize }),
+
+    // Pause memory extraction for a file
+    memoryPauseForFile: (fileId: string): Promise<{
+        success: boolean;
+        fileId: string;
+        message: string;
+    }> => ipcRenderer.invoke('memory:pause', { fileId }),
+
+    // Get backend settings (includes memory_chunk_size)
+    getSettings: (): Promise<{
+        vision_max_pixels: number;
+        video_max_pixels: number;
+        embed_batch_size: number;
+        embed_batch_delay_ms: number;
+        vision_batch_delay_ms: number;
+        search_result_limit: number;
+        qa_context_limit: number;
+        max_snippet_length: number;
+        summary_max_tokens: number;
+        pdf_one_chunk_per_page: boolean;
+        rag_chunk_size: number;
+        rag_chunk_overlap: number;
+        default_indexing_mode: 'fast' | 'deep';
+        enable_memory_extraction: boolean;
+        memory_extraction_stage: 'fast' | 'deep' | 'none';
+        memory_chunk_size: number;
+    }> => ipcRenderer.invoke('settings:get-backend'),
 
     // ========================================
     // Privacy APIs
@@ -613,6 +777,17 @@ const api = {
         filesNormal: number;
         filesPrivate: number;
     }> => ipcRenderer.invoke('privacy:get-folder', { folderId }),
+
+    on: (channel: string, callback: (event: any, ...args: any[]) => void) => {
+        const subscription = (_event: any, ...args: any[]) => callback(_event, ...args);
+        ipcRenderer.on(channel, subscription);
+        return () => {
+            ipcRenderer.removeListener(channel, subscription);
+        };
+    },
+    off: (channel: string, listener: (...args: any[]) => void) => {
+        ipcRenderer.removeListener(channel, listener);
+    }
 };
 
 contextBridge.exposeInMainWorld('api', api);

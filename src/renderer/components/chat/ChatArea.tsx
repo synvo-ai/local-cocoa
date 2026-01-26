@@ -5,7 +5,7 @@ import type { IndexedFile, SearchHit, ConversationMessage, ModelAssetStatus } fr
 interface ChatAreaProps {
     messages: ConversationMessage[];
     loading: boolean;
-    onSend: (text: string, mode?: SearchMode) => Promise<void>;
+    onSend: (text: string, mode?: SearchMode, useVisionForAnswer?: boolean) => Promise<void>;
     model: string;
     availableModels?: ModelAssetStatus[];
     onModelChange?: (modelId: string) => void;

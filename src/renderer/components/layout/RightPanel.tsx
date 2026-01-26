@@ -151,7 +151,7 @@ export function RightPanel({
     }, [selectedChunkId, activeChunk]);
 
     const fileId = file?.id ?? null;
-    const activeChunkId = activeChunk?.chunk_id ?? null;
+    const _activeChunkId = activeChunk?.chunk_id ?? null;
 
     const loadChunks = useCallback(
         async (opts?: { preserveContext?: boolean }) => {
@@ -835,6 +835,15 @@ export function RightPanel({
                                         <div className="font-mono">{totalPages}</div>
                                     </>
                                 )}
+                                <div className="text-muted-foreground">Memory Chunk</div>
+                                <div className="font-mono">
+                                    {file.memoryStatus === 'pending' || file.memoryStatus === 'skipped'
+                                        ? '-'
+                                        : file.memoryLastChunkSize
+                                            ? `${file.memoryLastChunkSize} chars`
+                                            : 'auto'
+                                    }
+                                </div>
                             </div>
                         </div>
                     </>

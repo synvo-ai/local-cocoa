@@ -6,7 +6,14 @@ export type FileKind =
     | 'audio'
     | 'video'
     | 'archive'
+    | 'code'
+    | 'book'
     | 'other';
+
+export type FileIndexStatus = 'pending' | 'indexed' | 'error';
+export type StageValue = 0 | 1 | 2 | -1 | -2;
+export type MemoryStatus = 'pending' | 'extracted' | 'skipped' | 'error';
+export type PrivacyLevel = 'normal' | 'private';
 
 export interface FolderRecord {
     id: string;
@@ -16,6 +23,7 @@ export interface FolderRecord {
     updatedAt: string;
     lastIndexedAt: string | null;
     enabled: boolean;
+    privacyLevel?: PrivacyLevel;
 }
 
 export interface MonitoredFolder extends FolderRecord { }
@@ -32,6 +40,22 @@ export interface FileRecord {
     kind: FileKind;
     summary?: string | null;
     metadata?: Record<string, unknown>;
+    // Index status tracking
+    indexStatus?: FileIndexStatus;
+    errorReason?: string | null;
+    errorAt?: string | null;
+    // Two-round indexing stages
+    fastStage?: StageValue;
+    fastTextAt?: string | null;
+    fastEmbedAt?: string | null;
+    deepStage?: StageValue;
+    deepTextAt?: string | null;
+    deepEmbedAt?: string | null;
+    // Memory extraction status
+    memoryStatus?: MemoryStatus;
+    memoryExtractedAt?: string | null;
+    // Privacy level
+    privacyLevel?: PrivacyLevel;
 }
 
 export interface IndexedFile extends FileRecord {

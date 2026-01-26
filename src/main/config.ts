@@ -6,11 +6,23 @@ import pkgJson from '../../package.json';
 
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'prod';
 const projectRoot = path.resolve(__dirname, '../..');
-const runtimeRoot = isDev ? path.join(projectRoot, 'runtime') : process.resourcesPath;
+
+// Rumtime Root directory, all dynamic data and files are stored here
+// In dev mode, for easy access 
+//    <project root>/runtime/
+// In production, use Electron's userData path
+//    Mac:  ~/Library/Application Support/Local Cocoa/
+//    Win:  c:/Users/<user name>/AppData/Roaming/Local Cocoa/
+const runtimeRoot = isDev ? path.join(projectRoot, 'runtime') : app.getPath('userData');
+
+// Resource root directory, all static (read-only) data files are stored here. These files are created in compile phase and installed here
+const resourceRoot = isDev ? projectRoot : process.resourcesPath;
 
 const pkg = pkgJson as { name?: string; version?: string };
 process.env.APP_NAME = pkg.name ?? '';
 process.env.APP_VERSION = pkg.version ?? '';
+
+const backendResourceRoot = isDev ? runtimeRoot : resourceRoot;
 
 /**
  * Load environment variables based on the current mode
@@ -32,28 +44,34 @@ export function loadEnvConfig() {
 
 export const config = {
     isDev,
-    projectRoot,
     get devServerUrl() { return process.env.VITE_DEV_SERVER_URL ?? ''; },
     get ports() {
         return {
             backend: parseInt(process.env.LOCAL_RAG_PORT ?? '8890'),
-            vlm: 8007, // Keep hardcoded or add to env if needed, based on existing pattern only backend was varied mostly? Actually let's use env if available but keep defaults matching default.json
+            vlm: 8007,
             embedding: 8005,
             reranker: 8006,
             whisper: 8080,
+            mcpDirect: 5566, // Direct HTTP server for MCP activity notifications
         };
     },
     get urls() {
         return {
-            backend: process.env.LOCAL_RAG_API_URL ?? 'http://127.0.0.1:8890',
+            backend: process.env.LOCAL_RAG_API_URL,
         };
     },
     paths: {
-        llamaServer: path.join(runtimeRoot, 'llama-cpp', 'bin', `llama-server${process.platform === 'win32' ? '.exe' : ''}`),
-        whisperServer: path.join(runtimeRoot, 'whisper-cpp', 'bin', `whisper-server${process.platform === 'win32' ? '.exe' : ''}`),
-        backendScript: path.join(runtimeRoot, 'local_rag_dist', `run${process.platform === 'win32' ? '.ps1' : '.sh'}`),
-        preload: path.join(__dirname, '../preload', isDev ? 'preload-dev.js' : 'preload.js'),
-        dist: path.join(projectRoot, 'dist-electron', 'renderer'),
+        projectRoot,
+        resourceRoot,
+        runtimeRoot,
+        backendResourceRoot,
+        modelRoot: path.join(runtimeRoot, 'local-cocoa-models', 'pretrained'),
+        electronLogPath: process.env.LOCAL_ELECTRON_LOG_PATH ? path.join(runtimeRoot, process.env.LOCAL_ELECTRON_LOG_PATH) : '',
+        llamaServer: path.join(backendResourceRoot, 'llama-cpp', 'bin', `llama-server${process.platform === 'win32' ? '.exe' : ''}`),
+        whisperServer: path.join(backendResourceRoot, 'whisper-cpp', 'bin', `whisper-server${process.platform === 'win32' ? '.exe' : ''}`),
+        // Always use compiled preload.js (ts-node in preload context causes issues)
+        preload: path.join(projectRoot, 'dist-electron', 'preload', 'preload.js'),
+        dist: path.join(__dirname, 'dist-electron', 'renderer'),
     },
     windows: {
         main: {
@@ -75,5 +93,15 @@ export const config = {
     appInfo: {
         name: pkg.name,
         version: pkg.version
+    },
+    // additional config for engineering
+    get debugMode() {
+        return process.env.DEBUG?.toLowerCase() === 'true';
+    },
+    get backend() {
+        return {
+            launchPythonServer: process.env.LOCAL_SERVICE_LAUNCH_PYTHON_SERVER?.toLowerCase() === 'true',
+            logToFile: process.env.LOCAL_SERVICE_LOG_TO_FILE,
+        }
     }
 };

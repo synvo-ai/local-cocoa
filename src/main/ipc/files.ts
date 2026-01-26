@@ -1,6 +1,7 @@
 import { ipcMain, dialog, shell, app } from 'electron';
 import fs from 'fs';
 import path from 'path';
+import { config } from '../config';
 import {
     listFolders,
     addFolder,
@@ -33,6 +34,11 @@ import {
     getFilePrivacy,
     setFolderPrivacy,
     getFolderPrivacy,
+    // Memory
+    extractMemoryForFile,
+    pauseMemoryForFile,
+    // Settings
+    getBackendSettings,
 } from '../backendClient';
 import { WindowManager } from '../windowManager';
 
@@ -48,8 +54,7 @@ async function isPathInIndexedFolders(targetPath: string): Promise<boolean> {
                 return true;
             }
         }
-        const userData = app.getPath('userData');
-        if (resolvedTarget.startsWith(userData + path.sep)) {
+        if (resolvedTarget.startsWith(config.paths.runtimeRoot + path.sep)) {
             return true;
         }
         return false;
@@ -326,5 +331,44 @@ export function registerFileHandlers(windowManager: WindowManager) {
             filesNormal: result.files_normal,
             filesPrivate: result.files_private
         };
+    });
+
+    // ========================================
+    // Memory Extraction Handlers
+    // ========================================
+
+    ipcMain.handle('memory:extract', async (_event, payload: { fileId: string; userId?: string; force?: boolean; chunkSize?: number }) => {
+        if (!payload?.fileId) {
+            throw new Error('Missing file id.');
+        }
+        const result = await extractMemoryForFile(payload.fileId, payload.userId, payload.force ?? false, payload.chunkSize);
+        return {
+            success: result.success,
+            fileId: result.file_id,
+            message: result.message,
+            episodesCreated: result.episodes_created,
+            eventLogsCreated: result.event_logs_created,
+            foresightsCreated: result.foresights_created,
+        };
+    });
+
+    ipcMain.handle('memory:pause', async (_event, payload: { fileId: string }) => {
+        if (!payload?.fileId) {
+            throw new Error('Missing file id.');
+        }
+        const result = await pauseMemoryForFile(payload.fileId);
+        return {
+            success: result.success,
+            fileId: result.file_id,
+            message: result.message,
+        };
+    });
+
+    // ========================================
+    // Backend Settings Handlers
+    // ========================================
+
+    ipcMain.handle('settings:get-backend', async () => {
+        return getBackendSettings();
     });
 }

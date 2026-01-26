@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState, useRef, useEffect, useCallback, CSSProperties } from 'react';
-import { Send, RefreshCw, FileText, Sparkles, Layers, ChevronDown, Zap, BookOpen, MessageCircle } from 'lucide-react';
+import { Send, RefreshCw, FileText, Layers, ChevronDown, Zap, BookOpen, MessageCircle, Eye } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import type { SearchHit, ConversationMessage, IndexedFile, ModelAssetStatus } from '../types';
 import { LoadingDots } from './LoadingDots';
@@ -43,7 +43,7 @@ export interface AgentContext {
 interface ConversationPanelProps {
     messages: ConversationMessage[];
     loading: boolean;
-    onSend: (text: string, mode?: SearchMode) => Promise<void>;
+    onSend: (text: string, mode?: SearchMode, useVisionForAnswer?: boolean) => Promise<void>;
     model: string;
     availableModels?: ModelAssetStatus[];
     onModelChange?: (modelId: string) => void;
@@ -90,7 +90,7 @@ function ReferenceItem({ reference, index, onPreview }: { reference: SearchHit, 
     // Chunk analysis info
     const hasAnswer = reference.hasAnswer;
     const analysisComment = reference.analysisComment;
-    const confidence = reference.analysisConfidence ?? 0;
+    const _confidence = reference.analysisConfidence ?? 0;
 
     // Determine if this chunk was analyzed (hasAnswer is defined means it was analyzed)
     const wasAnalyzed = hasAnswer !== undefined;
@@ -505,10 +505,10 @@ export function ConversationPanel({
     messages,
     loading,
     onSend,
-    model,
-    availableModels,
-    onModelChange,
-    onAddLocalModel,
+    model: _model,
+    availableModels: _availableModels,
+    onModelChange: _onModelChange,
+    onAddLocalModel: _onAddLocalModel,
     title = 'Ask your workspace',
     subtitle,
     className,
@@ -523,9 +523,12 @@ export function ConversationPanel({
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [searchMode, setSearchMode] = useState<SearchMode>('auto');
     const [isModeDropdownOpen, setIsModeDropdownOpen] = useState(false);
+    const [useVisionForAnswer, setUseVisionForAnswer] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const modeDropdownRef = useRef<HTMLDivElement>(null);
+    // Track IME composition state to prevent accidental sends during Chinese/Japanese input
+    const isComposingRef = useRef(false);
     const { skin } = useSkin();
     const isCocoaSkin = skin === 'local-cocoa';
 
@@ -590,6 +593,7 @@ export function ConversationPanel({
         } finally {
             setIsRefreshingSuggestions(false);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -617,7 +621,7 @@ export function ConversationPanel({
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
         }
-        await onSend(trimmedInput, searchMode);
+        await onSend(trimmedInput, searchMode, useVisionForAnswer);
     }
 
     function renderMessageText(text: string, references?: SearchHit[]) {
@@ -683,7 +687,7 @@ export function ConversationPanel({
                             }
                             // Handle array of children
                             const processed = Array.isArray(children)
-                                ? children.map((child, idx) =>
+                                ? children.map((child, _idx) =>
                                     typeof child === 'string' ? processReferences(child) : child
                                 )
                                 : children;
@@ -1088,11 +1092,14 @@ export function ConversationPanel({
                                 }
                             }
 
-                            if (e.key === 'Enter' && !e.shiftKey) {
+                            // Only send on Enter if not composing (IME) and not holding Shift
+                            if (e.key === 'Enter' && !e.shiftKey && !isComposingRef.current) {
                                 e.preventDefault();
                                 handleSubmit(e);
                             }
                         }}
+                        onCompositionStart={() => { isComposingRef.current = true; }}
+                        onCompositionEnd={() => { isComposingRef.current = false; }}
                         style={{ minHeight: '48px', maxHeight: '200px' }}
                     />
                     <button
@@ -1113,19 +1120,43 @@ export function ConversationPanel({
                     </button>
                 </form>
 
-                {/* Search Mode Selector */}
+                {/* Search Mode Selector and Vision Toggle */}
                 <div className="mx-auto max-w-4xl mt-2 flex items-center justify-between">
-                    <div className="relative" ref={modeDropdownRef}>
+                    <div className="flex items-center gap-2">
+                        {/* Vision Toggle */}
                         <button
                             type="button"
-                            onClick={() => setIsModeDropdownOpen(!isModeDropdownOpen)}
+                            onClick={() => setUseVisionForAnswer(!useVisionForAnswer)}
+                            title={useVisionForAnswer 
+                                ? "Vision Mode: ON - Using VLM to analyze page images" 
+                                : "Vision Mode: OFF - Using extracted text chunks"}
                             className={cn(
                                 "flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium transition-all",
-                                isCocoaSkin
-                                    ? "text-[#8b6914]/80 hover:bg-[#c9a87c]/20 border border-transparent hover:border-[#c9a87c]/40"
-                                    : "text-muted-foreground hover:bg-muted/50 border border-transparent hover:border-border"
+                                useVisionForAnswer
+                                    ? isCocoaSkin
+                                        ? "bg-[#8b6914] text-white border border-[#8b6914]"
+                                        : "bg-primary text-primary-foreground border border-primary"
+                                    : isCocoaSkin
+                                        ? "text-[#8b6914]/80 hover:bg-[#c9a87c]/20 border border-transparent hover:border-[#c9a87c]/40"
+                                        : "text-muted-foreground hover:bg-muted/50 border border-transparent hover:border-border"
                             )}
                         >
+                            <Eye className="h-3 w-3" />
+                            <span>Vision</span>
+                        </button>
+
+                        {/* Search Mode Selector */}
+                        <div className="relative" ref={modeDropdownRef}>
+                            <button
+                                type="button"
+                                onClick={() => setIsModeDropdownOpen(!isModeDropdownOpen)}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium transition-all",
+                                    isCocoaSkin
+                                        ? "text-[#8b6914]/80 hover:bg-[#c9a87c]/20 border border-transparent hover:border-[#c9a87c]/40"
+                                        : "text-muted-foreground hover:bg-muted/50 border border-transparent hover:border-border"
+                                )}
+                            >
                             {(() => {
                                 const config = SEARCH_MODE_CONFIG[searchMode];
                                 const Icon = config.icon;
@@ -1205,6 +1236,7 @@ export function ConversationPanel({
                                 })}
                             </div>
                         )}
+                        </div>
                     </div>
 
                     <div className={cn(

@@ -25,7 +25,7 @@ const ONBOARDING_KEY = 'local-cocoa-onboarding-completed';
 
 function isConnectorPath(pathValue: string | null | undefined): boolean {
     const normalised = (pathValue ?? '').replace(/\\/g, '/').toLowerCase();
-    return normalised.includes('/.local_rag/mail') || normalised.includes('/.local_rag/notes');
+    return normalised.includes('/.synvo_db/mail') || normalised.includes('/.synvo_db/notes');
 }
 
 function isActivitySummariesPath(pathValue: string | null | undefined): boolean {
@@ -50,12 +50,12 @@ export function MainAppView() {
         setRightPanelTabRequest((prev) => ({ tab, nonce: (prev?.nonce ?? 0) + 1 }));
     }, []);
 
-    const isContextTooLargeError = useCallback((value: unknown) => {
+    const _isContextTooLargeError = useCallback((value: unknown) => {
         const message = (value instanceof Error ? value.message : String(value ?? '')).toLowerCase();
         return message.includes('exceeds the available context size') || message.includes('available context size');
     }, []);
 
-    const showContextTooLargeWarning = useCallback(() => {
+    const _showContextTooLargeWarning = useCallback(() => {
         setNotification({
             message: 'This request is too large for the model context window. Try lowering Vision Performance (Max Resolution) or increasing Context Size in Models.',
             action: {
@@ -449,6 +449,22 @@ export function MainAppView() {
         setActiveView(view);
     };
 
+    // MBTI Analysis hook
+    const {
+        isAnalyzing,
+        isGeneratingReport,
+        progress: mbtiProgress,
+        result: mbtiResult,
+        error: mbtiError,
+        filterProgress,
+        embedProgress,
+        startAnalysis: startMbtiAnalysis,
+        startAnalysisWithFilter,
+        stopAnalysis: stopMbtiAnalysis,
+        resetAnalysis: resetMbtiAnalysis,
+        setProgress: setMbtiProgress
+    } = useMbtiAnalysis();
+
     const handleOpenIndexProgress = useCallback(() => {
         setIndexDrawerOpen(true);
         requestRightPanelTab('progress');
@@ -499,175 +515,184 @@ export function MainAppView() {
         });
     }, []);
 
-    if (!isBackendReady && !modelsReady) {
-        // Determine appropriate status message
-        const statusMessage = backendStarting
-            ? 'Starting backend services...'
-            : (health?.message || 'Connecting to services...');
 
-        return (
-            <>
+
+    const statusMessage = backendStarting
+        ? 'Starting backend services...'
+        : (health?.message || 'Connecting to services...');
+
+    return (
+        <>
+            {(!isBackendReady && !modelsReady) ? (
                 <StartupLoading
                     onOpenModelManager={() => setIsModelModalOpen(true)}
                     statusMessage={statusMessage}
                     modelsReady={modelsReady}
                 />
-                <ModelManagerModal
-                    isOpen={isModelModalOpen}
-                    onClose={() => {
-                        // Only allow closing if backend is ready, or if user just wants to close the modal
-                        // But if backend is not ready, we stay on StartupLoading.
-                        setIsModelModalOpen(false);
-                    }}
-                />
-            </>
-        );
-    }
-
-    return (
-        <AppLayout
-            sidebar={
-                <Sidebar
-                    sessions={sessions}
-                    currentSessionId={currentSessionId}
-                    onSelectSession={handleSelectSession}
-                    onCreateSession={handleCreateSession}
-                    onDeleteSession={handleDeleteSession}
-                    activeView={activeView}
-                    onSelectView={handleViewSelect}
-                    onOpenIndexProgress={handleOpenIndexProgress}
-                    isIndexing={isIndexing}
-                    indexStatus={progress?.status ?? null}
-                    onOpenGuide={handleOpenGuide}
-                />
-            }
-            rightPanel={
-                (selectedFile || selectedHit || indexDrawerOpen) ? (
-                    <RightPanel
-                        selectedFile={selectedFile}
-                        selectedHit={selectedHit}
-                        onClose={() => {
-                            setSelectedFile(null);
-                            setSelectedHit(null);
-                        }}
-                        onOpenFile={handleOpenFile}
-                        indexingOpen={indexDrawerOpen}
-                        isIndexing={isIndexing}
-                        indexProgress={progress}
-                        indexingItems={filteredIndexingItems}
-                        stageProgress={stageProgress}
-                        onCloseIndexing={() => setIndexDrawerOpen(false)}
-                        tabRequest={rightPanelTabRequest}
-                        onRemoveFromQueue={handleRemoveFromQueue}
-                        onPauseIndexing={handlePauseIndexing}
-                        onResumeIndexing={handleResumeIndexing}
-                    />
-                ) : null
-            }
-        >
-            {notification && (
-                <div
-                    className="app-no-drag fixed bottom-4 right-4 z-50 flex max-w-[640px] items-start justify-between gap-3 rounded-md bg-destructive px-4 py-3 text-sm text-destructive-foreground shadow"
-                    style={{ zIndex: 10000 }}
-                >
-                    <div className="min-w-0 flex-1 break-words">{renderNotificationMessage(notification.message)}</div>
-                    <div className="flex items-center gap-2">
-                        {notification.action && (
-                            <button
-                                onClick={() => {
-                                    notification.action?.onClick();
-                                    setNotification(null);
+            ) : (
+                <AppLayout
+                    sidebar={
+                        <Sidebar
+                            sessions={sessions}
+                            currentSessionId={currentSessionId}
+                            onSelectSession={handleSelectSession}
+                            onCreateSession={handleCreateSession}
+                            onDeleteSession={handleDeleteSession}
+                            activeView={activeView}
+                            onSelectView={handleViewSelect}
+                            onOpenIndexProgress={handleOpenIndexProgress}
+                            isIndexing={isIndexing}
+                            indexStatus={progress?.status ?? null}
+                            onOpenGuide={handleOpenGuide}
+                        />
+                    }
+                    rightPanel={
+                        (selectedFile || selectedHit || indexDrawerOpen) ? (
+                            <RightPanel
+                                selectedFile={selectedFile}
+                                selectedHit={selectedHit}
+                                onClose={() => {
+                                    setSelectedFile(null);
+                                    setSelectedHit(null);
                                 }}
-                                className="underline hover:no-underline"
-                            >
-                                {notification.action.label}
-                            </button>
-                        )}
-                        <button onClick={() => setNotification(null)} className="ml-2 opacity-80 hover:opacity-100">
-                            ✕
-                        </button>
-                    </div>
-                </div>
-            )}
-            {activeView === 'chat' && (
-                <ChatArea
-                    messages={messages}
-                    loading={isAnswering}
-                    onSend={handleSend}
-                    model={selectedModel}
-                    availableModels={availableModels}
-                    onModelChange={setActiveModel}
-                    onAddLocalModel={addLocalModel}
-                    onReferenceOpen={handleReferenceOpen}
-                    agentContext={agentContext}
-                    onResetConversation={handleResetConversation}
-                    currentSessionId={currentSessionId}
-                    title={currentSession?.title}
-                    files={visibleFiles}
-                    onResume={handleResumeSearch}
-                />
-            )}
-            {activeView === 'knowledge' && (
-                <KnowledgeBase
-                    folders={visibleFolders}
-                    folderStats={folderStats}
-                    files={visibleFiles}
-                    snapshot={snapshot}
-                    isIndexing={isIndexing}
-                    indexProgress={progress}
-                    stageProgress={stageProgress}
-                    onStartSemantic={startSemanticIndexing}
-                    onStopSemantic={stopSemanticIndexing}
-                    onStartDeep={startDeepIndexing}
-                    onStopDeep={stopDeepIndexing}
-                    onAddFolder={handleAddFolder}
-                    onAddFile={handleAddFile}
-                    onRemoveFolder={handleRemoveFolder}
-                    onRescanFolder={handleRescanFolder}
-                    onReindexFolder={handleReindexFolder}
-                    indexingItems={indexingItems}
-                    onSelectFile={(file) => {
-                        setSelectedFile(file);
-                        requestRightPanelTab('preview');
-                    }}
-                    onOpenFile={handleOpenFile}
-                    onAskAboutFile={handleAskAboutFile}
-                    onRefresh={refreshData}
-                />
-            )}
-            {activeView === 'extensions' && (
-                <div className="h-full overflow-hidden">
-                    <ExtensionsView onOpenFile={handleOpenFile} />
-                </div>
-            )}
-            {activeView === 'memory' && (
-                <UserMemory />
-            )}
-            {activeView === 'models' && (
-                <SettingsPanel initialTab="models" />
-            )}
-            {activeView === 'settings' && (
-                <SettingsPanel initialTab="general" />
-            )}
+                                onOpenFile={handleOpenFile}
+                                indexingOpen={indexDrawerOpen}
+                                isIndexing={isIndexing}
+                                indexProgress={progress}
+                                indexingItems={filteredIndexingItems}
+                                stageProgress={stageProgress}
+                                onCloseIndexing={() => setIndexDrawerOpen(false)}
+                                tabRequest={rightPanelTabRequest}
+                                onRemoveFromQueue={handleRemoveFromQueue}
+                                onPauseIndexing={handlePauseIndexing}
+                                onResumeIndexing={handleResumeIndexing}
+                            />
+                        ) : null
+                    }
+                >
+                    {notification && (
+                        <div
+                            className="app-no-drag fixed bottom-4 right-4 z-50 flex max-w-[640px] items-start justify-between gap-3 rounded-md bg-destructive px-4 py-3 text-sm text-destructive-foreground shadow"
+                            style={{ zIndex: 10000 }}
+                        >
+                            <div className="min-w-0 flex-1 break-words">{renderNotificationMessage(notification.message)}</div>
+                            <div className="flex items-center gap-2">
+                                {notification.action && (
+                                    <button
+                                        onClick={() => {
+                                            notification.action?.onClick();
+                                            setNotification(null);
+                                        }}
+                                        className="underline hover:no-underline"
+                                    >
+                                        {notification.action.label}
+                                    </button>
+                                )}
+                                <button onClick={() => setNotification(null)} className="ml-2 opacity-80 hover:opacity-100">
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    {activeView === 'chat' && (
+                        <ChatArea
+                            messages={messages}
+                            loading={isAnswering}
+                            onSend={handleSend}
+                            model={selectedModel}
+                            availableModels={availableModels}
+                            onModelChange={setActiveModel}
+                            onAddLocalModel={addLocalModel}
+                            onReferenceOpen={handleReferenceOpen}
+                            agentContext={agentContext}
+                            onResetConversation={handleResetConversation}
+                            currentSessionId={currentSessionId}
+                            title={currentSession?.title}
+                            files={visibleFiles}
+                            onResume={handleResumeSearch}
+                        />
+                    )}
+                    {activeView === 'knowledge' && (
+                        <KnowledgeBase
+                            folders={visibleFolders}
+                            folderStats={folderStats}
+                            files={visibleFiles}
+                            snapshot={snapshot}
+                            isIndexing={isIndexing}
+                            indexProgress={progress}
+                            stageProgress={stageProgress}
+                            onStartSemantic={startSemanticIndexing}
+                            onStopSemantic={stopSemanticIndexing}
+                            onStartDeep={startDeepIndexing}
+                            onStopDeep={stopDeepIndexing}
+                            onAddFolder={handleAddFolder}
+                            onAddFile={handleAddFile}
+                            onRemoveFolder={handleRemoveFolder}
+                            onRescanFolder={handleRescanFolder}
+                            onReindexFolder={handleReindexFolder}
+                            indexingItems={indexingItems}
+                            onSelectFile={(file) => {
+                                setSelectedFile(file);
+                                requestRightPanelTab('preview');
+                            }}
+                            onOpenFile={handleOpenFile}
+                            onAskAboutFile={handleAskAboutFile}
+                            onRefresh={refreshData}
+                        />
+                    )}
+                    {activeView === 'extensions' && (
+                        <div className="h-full overflow-hidden">
+                            <ExtensionsView />
+                        </div>
+                    )}
+                    {activeView === 'memory' && (
+                        <UserMemory />
+                    )}
+                    {activeView === 'models' && (
+                        <SettingsPanel initialTab="models" />
+                    )}
+                    {activeView === 'settings' && (
+                        <SettingsPanel initialTab="general" />
+                    )}
+                    {activeView === 'mbti' && (
+                        <MbtiAnalysis
+                            isAnalyzing={isAnalyzing}
+                            isGeneratingReport={isGeneratingReport}
+                            progress={mbtiProgress}
+                            result={mbtiResult}
+                            error={mbtiError}
+                            filterProgress={filterProgress}
+                            embedProgress={embedProgress}
+                            onStartAnalysis={startMbtiAnalysis}
+                            onStartAnalysisWithFilter={startAnalysisWithFilter}
+                            onStopAnalysis={stopMbtiAnalysis}
+                            onResetAnalysis={resetMbtiAnalysis}
+                            setProgress={setMbtiProgress}
+                            files={visibleFiles}
+                        />
+                    )}
 
+
+
+                    <OnboardingGuide
+                        isOpen={isOnboardingOpen}
+                        onClose={() => setIsOnboardingOpen(false)}
+                        onComplete={handleOnboardingComplete}
+                        onNavigate={handleViewSelect}
+                        modelsReady={modelsReady}
+                        onDownloadModels={handleManualModelDownload}
+                        modelDownloadEvent={modelDownloadEvent}
+                    />
+                </AppLayout>
+            )}
             <ModelManagerModal
-                isOpen={isModelModalOpen}
+                isOpen={isModelModalOpen && !isOnboardingOpen}
                 onClose={() => {
                     if (modelsReady) {
                         setIsModelModalOpen(false);
                     }
                 }}
             />
-
-            <OnboardingGuide
-                isOpen={isOnboardingOpen}
-                onClose={() => setIsOnboardingOpen(false)}
-                onComplete={handleOnboardingComplete}
-                onNavigate={handleViewSelect}
-                modelsReady={modelsReady}
-                onDownloadModels={handleManualModelDownload}
-                modelDownloadEvent={modelDownloadEvent}
-            />
-        </AppLayout>
+        </>
     );
 }

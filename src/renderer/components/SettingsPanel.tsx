@@ -1,9 +1,9 @@
-import { Moon, Sun, Monitor, Activity, Database, Cpu, Settings as SettingsIcon, CheckCircle2, Download, Box, RotateCcw, Check, AlertCircle, Shield, Trash2, Plus, Copy, HardDrive, Folder, Cloud, X, Settings2, ChevronRight, FileDown, Loader2, Bug } from 'lucide-react';
+import { Moon, Sun, Monitor, Activity, Database, Cpu, Settings as SettingsIcon, CheckCircle2, Download, Box, RotateCcw, Check, AlertCircle, Shield, Trash2, Plus, Copy, HardDrive, Folder, Cloud, X, Settings2, ChevronRight, FileDown, Loader2, Bug, Brain } from 'lucide-react';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { CSSProperties, useEffect, useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './theme-provider';
-import { useSkin, AVAILABLE_SKINS, type Skin } from './skin-provider';
+import { useSkin, AVAILABLE_SKINS } from './skin-provider';
 import { useWorkspaceData } from '../hooks/useWorkspaceData';
 import { useModelConfig } from '../hooks/useModelConfig';
 import { useModelStatus } from '../hooks/useModelStatus';
@@ -24,6 +24,10 @@ interface PythonSettings {
     embed_batch_delay_ms: number;
     vision_batch_delay_ms: number;
     default_indexing_mode: 'fast' | 'deep';
+    // Memory settings
+    enable_memory_extraction: boolean;
+    memory_extraction_stage: 'fast' | 'deep' | 'none';
+    memory_chunk_size: number;  // 0=use original chunks, >0=custom size
 }
 
 interface ModelGroup {
@@ -355,9 +359,8 @@ export function SettingsPanel({ initialTab = 'general' }: SettingsPanelProps) {
     const { config, loading: configLoading, updateConfig } = useModelConfig();
     const { modelStatus, handleManualModelDownload, handleRedownloadModel, modelDownloadEvent } = useModelStatus();
     const dragStyle = { WebkitAppRegion: 'drag' } as CSSProperties;
-    const MANUAL_KEY_STORAGE = 'local_rag_api_key_override';
 
-    const [activeTab, setActiveTab] = useState<'general' | 'models' | 'retrieval' | 'security' | 'scan'>(initialTab);
+    const [activeTab, setActiveTab] = useState<'general' | 'models' | 'retrieval' | 'memory' | 'security' | 'scan'>(initialTab);
     const [pythonSettings, setPythonSettings] = useState<PythonSettings | null>(null);
 
     // Listen for tab switch requests (e.g., from Scan page)
@@ -375,8 +378,6 @@ export function SettingsPanel({ initialTab = 'general' }: SettingsPanelProps) {
     }, []);
     const [showSaveSuccess, setShowSaveSuccess] = useState(false);
     const [localKey, setLocalKey] = useState<string | null>(null);
-    const [manualApiKey, setManualApiKey] = useState('');
-    const [manualKeyApplied, setManualKeyApplied] = useState(false);
     const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
     const [newKeyName, setNewKeyName] = useState('');
     const [createdKey, setCreatedKey] = useState<ApiKey | null>(null);
@@ -412,45 +413,12 @@ export function SettingsPanel({ initialTab = 'general' }: SettingsPanelProps) {
     }, []);
 
     useEffect(() => {
-        const storedKey = localStorage.getItem(MANUAL_KEY_STORAGE)?.trim();
-        if (storedKey) {
-            setManualApiKey(storedKey);
-            window.api.setLocalKeyOverride(storedKey).then(() => {
-                setLocalKey(storedKey);
-                loadPythonSettings(storedKey);
-                setManualKeyApplied(true);
-            });
-            return;
-        }
-
         window.api.getLocalKey().then(key => {
             setLocalKey(key);
             if (key) {
                 loadPythonSettings(key);
             }
         });
-    }, [loadPythonSettings]);
-
-    const applyManualKey = useCallback(async () => {
-        const trimmed = manualApiKey.trim();
-        if (!trimmed) return;
-        localStorage.setItem(MANUAL_KEY_STORAGE, trimmed);
-        await window.api.setLocalKeyOverride(trimmed);
-        setLocalKey(trimmed);
-        loadPythonSettings(trimmed);
-        setManualKeyApplied(true);
-    }, [manualApiKey, loadPythonSettings]);
-
-    const clearManualKey = useCallback(async () => {
-        localStorage.removeItem(MANUAL_KEY_STORAGE);
-        setManualApiKey('');
-        await window.api.setLocalKeyOverride(null);
-        const key = await window.api.getLocalKey();
-        setLocalKey(key);
-        if (key) {
-            loadPythonSettings(key);
-        }
-        setManualKeyApplied(false);
     }, [loadPythonSettings]);
 
     // --- Scan Settings Logic ---
@@ -703,15 +671,21 @@ export function SettingsPanel({ initialTab = 'general' }: SettingsPanelProps) {
     const currentAudioModelId = config?.activeAudioModelId || 'whisper-small';
 
     return (
-        <div className="flex h-full flex-col bg-background">
+        <div className="flex h-full flex-col bg-gradient-to-br from-background via-background to-muted/20">
             {/* Header Region - Draggable */}
-            <div className="flex-none border-b px-6 pt-8 pb-0" style={dragStyle}>
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 className="text-lg font-semibold tracking-tight">{t('settings.title')}</h2>
-                        <p className="text-xs text-muted-foreground">{t('settings.subtitle')}</p>
+            <div className="flex-none border-b border-border/50 bg-card/30 backdrop-blur-sm" style={dragStyle}>
+                <div className="px-6 pt-8 pb-0">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                                <SettingsIcon className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold tracking-tight">{t('settings.title')}</h2>
+                                <p className="text-xs text-muted-foreground">{t('settings.subtitle')}</p>
+                            </div>
+                        </div>
                     </div>
-                </div>
 
                 {/* Tabs - Non-draggable */}
                 <div className="flex items-center gap-6" style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}>
@@ -734,6 +708,12 @@ export function SettingsPanel({ initialTab = 'general' }: SettingsPanelProps) {
                         <Database className="h-4 w-4" /> {t('settings.retrievalIndexing')}
                     </button>
                     <button
+                        onClick={() => setActiveTab('memory')}
+                        className={cn("flex items-center gap-2 py-3 text-sm font-medium border-b-2 transition-colors", activeTab === 'memory' ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}
+                    >
+                        <Brain className="h-4 w-4" /> Memory
+                    </button>
+                    <button
                         onClick={() => setActiveTab('security')}
                         className={cn("flex items-center gap-2 py-3 text-sm font-medium border-b-2 transition-colors", activeTab === 'security' ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}
                     >
@@ -745,6 +725,7 @@ export function SettingsPanel({ initialTab = 'general' }: SettingsPanelProps) {
                     >
                         <HardDrive className="h-4 w-4" /> {t('settings.scanScope')}
                     </button>
+                    </div>
                 </div>
             </div>
 
@@ -756,20 +737,47 @@ export function SettingsPanel({ initialTab = 'general' }: SettingsPanelProps) {
                             <div className="space-y-4">
                                 <h3 className="text-sm font-medium">{t('settings.systemHealth')}</h3>
                                 <div className="rounded-lg border bg-card p-4 space-y-3">
-                                    {health?.services?.map((service) => (
-                                        <div key={service.name} className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <Activity className="h-4 w-4 text-muted-foreground" />
-                                                <span className="text-sm font-medium">{service.name}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className={cn('h-2 w-2 rounded-full', service.status === 'online' ? 'bg-emerald-500' : 'bg-red-500')} />
-                                                <span className="text-xs text-muted-foreground">
-                                                    {service.status === 'online' ? `${Math.round(service.latencyMs || 0)}ms` : service.details || 'Offline'}
-                                                </span>
-                                            </div>
+                                    {!health ? (
+                                        <div className="flex items-center gap-3 text-muted-foreground">
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            <span className="text-sm">{t('settings.connectingToBackend', 'Connecting to backend...')}</span>
                                         </div>
-                                    ))}
+                                    ) : health.status === 'degraded' ? (
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-2">
+                                                <AlertCircle className="h-4 w-4 text-destructive" />
+                                                <span className="text-sm font-medium text-destructive">{t('settings.backendOffline', 'Backend Offline')}</span>
+                                            </div>
+                                            <span className="text-xs text-muted-foreground">
+                                                {health.message || t('settings.backendNotReachable', 'Service not reachable. Please restart the application.')}
+                                            </span>
+                                        </div>
+                                    ) : health.services && health.services.length > 0 ? (
+                                        health.services.map((service) => (
+                                            <div key={service.name} className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <Activity className="h-4 w-4 text-muted-foreground" />
+                                                    <span className="text-sm font-medium">{service.name}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={cn('h-2 w-2 rounded-full', service.status === 'online' ? 'bg-emerald-500' : 'bg-red-500')} />
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {service.status === 'online' ? `${Math.round(service.latencyMs || 0)}ms` : service.details || 'Offline'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                                                <span className="text-sm font-medium">{t('settings.systemOnline', 'System Online')}</span>
+                                            </div>
+                                            <span className="text-xs text-muted-foreground">
+                                                {t('settings.allServicesRunning', 'All services running normally')}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -943,42 +951,6 @@ export function SettingsPanel({ initialTab = 'general' }: SettingsPanelProps) {
                     {activeTab === 'models' && config && (
                         <div className="space-y-6">
                             <div className="rounded-lg border bg-card p-4 space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">API Key Override</label>
-                                    <p className="text-xs text-muted-foreground">
-                                        Use this when the backend is started outside the app. Requests will use this key.
-                                    </p>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="text"
-                                            value={manualApiKey}
-                                            onChange={(e) => setManualApiKey(e.target.value)}
-                                            placeholder="sk-session-..."
-                                            className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
-                                        />
-                                        <button
-                                            onClick={applyManualKey}
-                                            disabled={!manualApiKey.trim()}
-                                            className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            <Check className="h-3.5 w-3.5" />
-                                            Apply
-                                        </button>
-                                        <button
-                                            onClick={clearManualKey}
-                                            className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                            Clear
-                                        </button>
-                                    </div>
-                                    {manualKeyApplied && (
-                                        <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                                            Manual key applied for this session.
-                                        </p>
-                                    )}
-                                </div>
-
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Active Multimodal Model</label>
                                     <select
@@ -1269,8 +1241,6 @@ export function SettingsPanel({ initialTab = 'general' }: SettingsPanelProps) {
                                 </div>
                             </div>
 
-
-
                             <div className="space-y-4">
                                 <div>
                                     <h3 className="text-sm font-medium">Retrieval Settings</h3>
@@ -1315,6 +1285,106 @@ export function SettingsPanel({ initialTab = 'general' }: SettingsPanelProps) {
                                         <p className="text-xs text-muted-foreground">
                                             Number of evidence pieces sent to the AI when answering questions. More evidences improve answer quality but increase response time.
                                         </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {showSaveSuccess && (
+                                <div className="flex items-center gap-2 text-sm text-emerald-600 animate-in fade-in duration-200">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    <span>Settings saved</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'memory' && pythonSettings && (
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <h2 className="text-lg font-semibold flex items-center gap-2">
+                                    <Brain className="h-5 w-5" />
+                                    Memory Settings
+                                </h2>
+                                <p className="text-sm text-muted-foreground">
+                                    Configure how Synvo extracts and stores memories from your documents.
+                                </p>
+                            </div>
+
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-medium">Memory Extraction</h3>
+                                <div className="rounded-lg border bg-card p-4 space-y-4">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-sm font-medium">Enable Memory Extraction</label>
+                                            <button
+                                                onClick={() => updatePythonSetting('enable_memory_extraction', !pythonSettings.enable_memory_extraction)}
+                                                className={cn(
+                                                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                                                    pythonSettings.enable_memory_extraction ? "bg-primary" : "bg-muted"
+                                                )}
+                                            >
+                                                <span
+                                                    className={cn(
+                                                        "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                                                        pythonSettings.enable_memory_extraction ? "translate-x-6" : "translate-x-1"
+                                                    )}
+                                                />
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Extract episodes, events, and foresights from your documents to build personalized memory.
+                                        </p>
+                                    </div>
+
+                                    {pythonSettings.enable_memory_extraction && (
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Auto-Extraction Stage</label>
+                                            <select
+                                                value={pythonSettings.memory_extraction_stage}
+                                                onChange={(e) => updatePythonSetting('memory_extraction_stage', e.target.value as 'fast' | 'deep' | 'none')}
+                                                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                            >
+                                                <option value="fast">Fast Stage (Quick, text-based)</option>
+                                                <option value="deep">Deep Stage (Slower, includes VLM analysis)</option>
+                                                <option value="none">Manual Only (Recommended for debugging)</option>
+                                            </select>
+                                            <p className="text-xs text-muted-foreground">
+                                                Choose when to automatically extract memory during indexing. Set to &quot;Manual Only&quot; to trigger extraction manually from the files panel.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-medium">Chunk Size</h3>
+                                <div className="rounded-lg border bg-card p-4 space-y-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Memory Chunk Size</label>
+                                        <select
+                                            value={pythonSettings.memory_chunk_size || 0}
+                                            onChange={(e) => updatePythonSetting('memory_chunk_size', parseInt(e.target.value))}
+                                            className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                        >
+                                            <option value={0}>Auto (Use indexed chunks)</option>
+                                            <option value={1000}>1000 chars (Fine-grained)</option>
+                                            <option value={2000}>2000 chars (Balanced)</option>
+                                            <option value={3000}>3000 chars (Efficient)</option>
+                                            <option value={5000}>5000 chars (Fast)</option>
+                                        </select>
+                                        <p className="text-xs text-muted-foreground">
+                                            Controls how text is chunked for memory extraction.
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-md bg-muted/50 p-3 space-y-2">
+                                        <p className="text-xs font-medium">Chunk Size Guide:</p>
+                                        <ul className="text-xs text-muted-foreground space-y-1">
+                                            <li>• <strong>Auto:</strong> Uses original indexed chunks. Supports pause/resume.</li>
+                                            <li>• <strong>Custom sizes:</strong> Merges and re-chunks text. More efficient for large files, but no pause/resume support.</li>
+                                            <li>• <strong>Larger chunks</strong> = fewer LLM calls = faster processing</li>
+                                            <li>• <strong>Smaller chunks</strong> = more granular memories = better precision</li>
+                                        </ul>
                                     </div>
                                 </div>
                             </div>

@@ -17,18 +17,12 @@ if (process.platform === 'darwin') {
 // Load environment variables first before loading other modules (works in both dev and prod)
 loadEnvConfig();
 
-// Modify userData path for development, keep using the local project folder for convenience
-if (config.isDev) {
-    const devUserDataPath = path.join(config.projectRoot, 'runtime');
-    app.setPath('userData', devUserDataPath);
-    console.log(`[Main] Dev mode: userData path set to ${devUserDataPath}`);
-}
-
 import './logger'; // Initialize logger
+import { initializeRuntime } from './runtimeMigration';
 import { WindowManager } from './windowManager';
-import { ServiceManager } from './serviceManager';
 import { ModelManager } from './modelManager';
 import { PythonServer } from './pythonServer';
+import { ensureBackendSpawnsReady } from './backendClient';
 import { TrayManager } from './trayManager';
 import { setDebugMode, createDebugLogger } from './debug';
 import { registerFileHandlers } from './ipc/files';
@@ -41,7 +35,8 @@ import { registerSystemHandlers } from './ipc/system';
 import { registerScanHandlers } from './ipc/scan';
 import { registerMemoryHandlers } from './ipc/memory';
 import { registerMCPHandlers, initMCPServer } from './ipc/mcp';
-import { initPluginManager, getPluginManager } from './plugins';
+import { initPluginManager } from './plugins';
+import { startDirectMCPServer } from './mcpDirectServer';
 import { ModelDownloadEvent } from './types';
 
 process.on('uncaughtException', (error) => {
@@ -53,13 +48,12 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const windowManager = new WindowManager();
-const modelManager = new ModelManager(config.projectRoot);
-const serviceManager = new ServiceManager(config.projectRoot);
+const modelManager = new ModelManager(config.paths.modelRoot);
 const pythonServer = new PythonServer();
 let trayManager: TrayManager | null = null;
 
 // Initialize plugin manager
-const pluginManager = initPluginManager(config.projectRoot);
+const pluginManager = initPluginManager();
 
 function broadcastModelEvent(event: ModelDownloadEvent) {
     windowManager.broadcast('models:progress', event);
@@ -68,8 +62,8 @@ function broadcastModelEvent(event: ModelDownloadEvent) {
 modelManager.on('event', (event: ModelDownloadEvent) => {
     broadcastModelEvent(event);
     if (event.state === 'completed') {
-        console.log('[Main] Model download completed. Retrying service startup...');
-        startServices().catch(console.error);
+        console.log('[Main] Model download completed. Ensuring backend spawns are started...');
+        ensureBackendSpawnsReady().catch(console.error);
     }
 });
 
@@ -82,121 +76,50 @@ async function startServices() {
 
     const debugLog = createDebugLogger('Main');
     debugLog('startServices() called');
-    debugLog(`app.isPackaged: ${app.isPackaged}, isDev: ${config.isDev}`);
+    debugLog(`app.isPackaged: ${app.isPackaged}, isDev: ${config.isDev}, debugMode: ${config.debugMode}`);
 
-    // Start Python Backend with config
+    // We pass the models.config.json path so Python can resolve model relative paths
+    const modelsConfigPath = path.join(config.paths.projectRoot, 'config', 'models.config.json');
+
     await pythonServer.start({
-        LOCAL_VISION_MAX_PIXELS: (modelConfig.visionMaxPixels || 1003520).toString(),
-        LOCAL_PDF_ONE_CHUNK_PER_PAGE: String(modelConfig.pdfOneChunkPerPage ?? true)
+        LOCAL_RUNTIME_ROOT: config.paths.runtimeRoot,
+        LOCAL_MODEL_ROOT_PATH: config.paths.modelRoot,
+        LOCAL_MODELS_CONFIG_PATH: modelsConfigPath,
+        LOCAL_ACTIVE_MODEL_ID: modelConfig.activeModelId,
+        LOCAL_ACTIVE_EMBEDDING_MODEL_ID: modelConfig.activeEmbeddingModelId,
+        LOCAL_ACTIVE_RERANKER_MODEL_ID: modelConfig.activeRerankerModelId,
+        LOCAL_ACTIVE_AUDIO_MODEL_ID: modelConfig.activeAudioModelId,
+        LOCAL_SERVICE_LOG_TO_FILE: config.backend.logToFile ?? 'false'
     });
 
-    const modelPath = modelManager.getModelPath(modelConfig.activeModelId);
-    const descriptor = modelManager.getDescriptor(modelConfig.activeModelId);
-
-    console.log('[Main] Starting services with config:', modelConfig);
-    console.log('[Main] Active model descriptor:', descriptor);
-    console.log('[Main] Resolved model path:', modelPath);
-
-    // Start VLM/LLM
     try {
-        let mmprojPath: string | undefined;
-        if (descriptor?.type === 'vlm' || descriptor?.id === 'vlm') {
-            if (descriptor.mmprojId) {
-                mmprojPath = modelManager.getModelPath(descriptor.mmprojId);
-            } else {
-                mmprojPath = modelManager.getModelPath('vlm-mmproj');
-            }
-        }
+        // Start MCP Direct Server (port 5566)
+        startDirectMCPServer(windowManager);
 
-        console.log('[Main] VLM mmproj path:', mmprojPath);
-
-        await serviceManager.startService({
-            alias: 'vlm',
-            modelPath: modelPath,
-            port: config.ports.vlm,
-            contextSize: modelConfig.contextSize,
-            threads: 4,
-            ngl: 999,
-            type: 'vlm',
-            mmprojPath: mmprojPath
-        });
+        await ensureBackendSpawnsReady();
     } catch (err) {
-        console.error('Failed to start VLM service:', err);
-    }
-
-    // Start Embedding
-    try {
-        const embeddingModelId = modelConfig.activeEmbeddingModelId || 'embedding-q4';
-        console.log('[Main] Starting embedding with model:', embeddingModelId);
-
-        // Fixed embedding server config - benchmark showed minimal impact from tuning
-        // Using economical defaults that work well across all configurations
-        await serviceManager.startService({
-            alias: 'embedding',
-            modelPath: modelManager.getModelPath(embeddingModelId),
-            port: config.ports.embedding,
-            contextSize: 8192,
-            threads: 4,         // Increased for parallel request handling
-            ngl: 999,
-            type: 'embedding',
-            batchSize: 8192,    // Max prompt length (tokens)
-            ubatchSize: 512,    // Micro-batch for GPU processing
-            parallel: 4         // 4 slots for parallel embedding requests
-        });
-
-
-
-
-    } catch (err) {
-        console.error('Failed to start Embedding service:', err);
-    }
-
-    // Start Reranker
-    try {
-        const rerankerModelId = modelConfig.activeRerankerModelId || 'reranker';
-        console.log('[Main] Starting reranker with model:', rerankerModelId);
-        await serviceManager.startService({
-            alias: 'reranker',
-            modelPath: modelManager.getModelPath(rerankerModelId),
-            port: config.ports.reranker,
-            contextSize: 4096,
-            threads: 2,
-            ngl: 999,
-            type: 'reranking',
-            ubatchSize: 2048
-        });
-    } catch (err) {
-        console.error('Failed to start Reranker service:', err);
-    }
-
-    // Start Whisper
-    try {
-        // Use configured audio model (can be changed in settings)
-        // Available: whisper-base (English only), whisper-small (multi-language), whisper-large-v3-turbo (best quality)
-        const whisperModelId = modelConfig.activeAudioModelId || 'whisper-small';
-
-        console.log('[Main] Starting whisper with model:', whisperModelId);
-        await serviceManager.startService({
-            alias: 'whisper',
-            modelPath: modelManager.getModelPath(whisperModelId),
-            port: config.ports.whisper,
-            contextSize: 0,
-            threads: 4,
-            ngl: 0,
-            type: 'whisper'
-        });
-    } catch (err) {
-        console.error('Failed to start Whisper service:', err);
+        console.error('Failed to ensure backend spawns are ready:', err);
     }
 }
 
 app.whenReady().then(async () => {
-    if (process.platform === 'darwin') {
-        const iconPath = path.join(config.projectRoot, 'assets', 'icon.png');
+    if (process.platform === 'darwin' && app.dock) {
+        const iconPath = path.join(config.paths.projectRoot, 'assets', 'icon.png');
         app.dock.setIcon(nativeImage.createFromPath(iconPath));
     }
 
     windowManager.createApplicationMenu();
+
+    // Validate and migrate runtime before starting services
+    try {
+        const runtimeValidation = await initializeRuntime();
+        if (!runtimeValidation.valid) {
+            console.error('[Main] Runtime validation failed. Some features may not work correctly.');
+            // Continue anyway - services will report their own errors if binaries are missing
+        }
+    } catch (error) {
+        console.error('[Main] Runtime initialization error:', error);
+    }
 
     // Start backend services FIRST, then create window
     // This ensures API key is available before frontend makes requests
@@ -263,7 +186,7 @@ app.on('before-quit', async (event) => {
     console.log('App before-quit: Stopping services...');
 
     try {
-        await serviceManager.stopAll();
+        // We only need to stop the Python server, which will clean up its subprocesses
         pythonServer.stop();
     } catch (error) {
         console.error('Error stopping services:', error);
@@ -279,11 +202,11 @@ registerEmailHandlers();
 registerNotesHandlers();
 registerChatHandlers();
 registerActivityHandlers();
-registerModelHandlers(modelManager, serviceManager);
+registerModelHandlers(modelManager);
 registerSystemHandlers(windowManager);
 registerScanHandlers();
 registerMemoryHandlers();
-registerMCPHandlers();
+registerMCPHandlers(windowManager);
 
 // Initialize MCP server (for Claude Desktop integration)
 initMCPServer();

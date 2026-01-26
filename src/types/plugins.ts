@@ -79,23 +79,40 @@ export interface PluginFullInfo {
  * These are the built-in plugins with their default order
  */
 export const DEFAULT_PLUGINS_ORDER: string[] = [
-    'mail',
-    'notes',
     'mcp',
+    'notes',
+    'mail',
+    'activity',
+    'earlog',
+    'mbti',
+    'desktop_organizer',
+];
+
+/**
+ * Plugins that are supported and enabled by default
+ * Other plugins will be disabled by default and show "Unsupported yet" if opened
+ */
+export const SUPPORTED_PLUGINS: string[] = [
+    'mcp',
+    'notes',
+    'mail',
 ];
 
 /**
  * Default plugin config schema version
+ * Version 2: Only enable supported plugins (mcp, notes, mail) by default
  */
-export const PLUGINS_CONFIG_VERSION = 1;
+export const PLUGINS_CONFIG_VERSION = 2;
 
 /**
  * Create default user config for a plugin
  */
 export function createDefaultPluginConfig(pluginId: string, order: number): PluginUserConfig {
+    // Only enable supported plugins by default
+    const isSupported = SUPPORTED_PLUGINS.includes(pluginId);
     return {
         pluginId,
-        enabled: true,
+        enabled: isSupported,
         order,
     };
 }

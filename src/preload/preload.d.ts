@@ -41,7 +41,6 @@ declare global {
             addFolder: (path: string, label?: string, scanMode?: 'full' | 'manual') => Promise<FolderRecord>;
             removeFolder: (folderId: string) => Promise<{ id: string }>;
             getLocalKey: () => Promise<string | null>;
-            setLocalKeyOverride: (key: string | null) => Promise<boolean>;
             runIndex: (options?: RunIndexOptions) => Promise<IndexProgressUpdate>;
             indexFolder: (folderId: string) => Promise<IndexProgressUpdate>;
             indexFile: (path: string) => Promise<IndexProgressUpdate>;
@@ -68,7 +67,7 @@ declare global {
                 onData: (chunk: string) => void;
                 onError: (error: string) => void;
                 onDone: () => void;
-            }, searchMode?: 'auto' | 'knowledge' | 'direct') => () => void;
+            }, searchMode?: 'auto' | 'knowledge' | 'direct', resumeToken?: string, useVisionForAnswer?: boolean) => () => void;
             health: () => Promise<HealthStatus>;
             listEmailAccounts: () => Promise<EmailAccountSummary[]>;
             addEmailAccount: (payload: EmailAccountPayload) => Promise<EmailAccountSummary>;

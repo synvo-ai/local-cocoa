@@ -2,6 +2,7 @@ import { ipcMain, shell } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { MCPServer } from '../mcpServer';
+import { WindowManager } from '../windowManager';
 import { listApiKeys, createApiKey, deleteApiKey, setApiKeyActive, renameApiKey, getOrCreateApiKey } from '../backendClient';
 
 let mcpServer: MCPServer | null = null;
@@ -29,7 +30,7 @@ export function getMCPServer(): MCPServer | null {
 /**
  * Register MCP-related IPC handlers
  */
-export function registerMCPHandlers(): void {
+export function registerMCPHandlers(windowManager?: WindowManager): void {
     // Get Claude Desktop config for Local Cocoa MCP
     ipcMain.handle('mcp:get-claude-config', async () => {
         const server = initMCPServer();
@@ -56,7 +57,7 @@ export function registerMCPHandlers(): void {
         try {
             // Get or create a persistent API key for Claude Desktop
             const apiKey = await getOrCreateApiKey(CLAUDE_DESKTOP_KEY_NAME);
-            
+
             // Generate config with the persistent key
             const mcpConfig = server.generateClaudeConfigWithKey(apiKey.key);
 
@@ -149,6 +150,13 @@ export function registerMCPHandlers(): void {
             return true;
         }
         return false;
+    });
+
+    // Close MCP activity window
+    ipcMain.on('mcp:close-window', () => {
+        if (windowManager?.mcpActivityWindow && !windowManager.mcpActivityWindow.isDestroyed()) {
+            windowManager.mcpActivityWindow.hide();
+        }
     });
 
     // Get MCP server status

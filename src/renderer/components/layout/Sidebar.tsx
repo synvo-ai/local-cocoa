@@ -59,8 +59,8 @@ export function Sidebar({
                     }}
                     className={cn(
                         "flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium shadow-sm transition-colors",
-                        isCocoaSkin 
-                            ? "cocoa-primary-btn" 
+                        isCocoaSkin
+                            ? "cocoa-primary-btn"
                             : "bg-primary text-primary-foreground hover:bg-primary/90"
                     )}
                     style={noDragStyle}
@@ -142,10 +142,10 @@ export function Sidebar({
                     </div>
                 </div>
                 {/* Gradient fade overlay at bottom */}
-                <div 
+                <div
                     className="pointer-events-none absolute bottom-0 left-0 right-0 h-16"
                     style={{
-                        background: isCocoaSkin 
+                        background: isCocoaSkin
                             ? 'linear-gradient(to bottom, transparent 0%, #1f1610 100%)'
                             : 'linear-gradient(to bottom, transparent 0%, hsl(var(--muted) / 0.3) 100%)'
                     }}
@@ -154,10 +154,10 @@ export function Sidebar({
 
             {/* Decorative separator line */}
             <div className="px-4 py-1">
-                <div 
+                <div
                     className="h-px"
                     style={{
-                        background: isCocoaSkin 
+                        background: isCocoaSkin
                             ? 'linear-gradient(90deg, transparent 0%, #8b6914 20%, #c9a227 50%, #8b6914 80%, transparent 100%)'
                             : 'linear-gradient(90deg, transparent 0%, hsl(var(--border)) 20%, hsl(var(--border)) 80%, transparent 100%)'
                     }}

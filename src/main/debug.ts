@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
+import { sanitizeLog } from './logSanitizer';
 
 // Debug mode state - can be updated at runtime
 let debugModeEnabled = false;
@@ -40,10 +41,13 @@ export function getDebugLogPath(): string {
 /**
  * Create a debug logger for a specific component
  * Only writes to file when debug mode is enabled
+ * Applies log sanitization for privacy protection
  */
 export function createDebugLogger(component: string) {
     return (msg: string) => {
-        const line = `[${new Date().toISOString()}] [${component}] ${msg}`;
+        // Sanitize the message to redact sensitive information
+        const sanitizedMsg = sanitizeLog(msg);
+        const line = `[${new Date().toISOString()}] [${component}] ${sanitizedMsg}`;
         
         // Always log to console
         console.log(line);

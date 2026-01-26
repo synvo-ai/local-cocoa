@@ -138,6 +138,88 @@
     "stopAnalysis": "Stop Analysis",
     "analyzing": "Analyzing...",
     "generatingReport": "Generating Report..."
+  },
+  "memory": {
+    "title": "User Memory",
+    "subtitle": "View and manage your personal memories and insights",
+    "refresh": "Refresh",
+    "tabs": {
+      "overview": "Overview",
+      "memcells": "MemCells",
+      "episodes": "Episodes",
+      "events": "Events",
+      "foresights": "Foresights",
+      "timeline": "Timeline"
+    },
+    "filters": {
+      "searchPlaceholder": "Search memories...",
+      "allTime": "All time",
+      "newestFirst": "Newest first",
+      "oldestFirst": "Oldest first",
+      "linkedOnly": "Linked only"
+    },
+    "stats": {
+      "memcells": "MemCells",
+      "episodes": "Episodes",
+      "eventLogs": "Event Logs",
+      "foresights": "Foresights"
+    },
+    "profile": {
+      "title": "Profile Snapshot",
+      "memory": "Profile memory",
+      "personality": "Personality",
+      "interests": "Interests",
+      "hardSkills": "Hard Skills",
+      "softSkills": "Soft Skills",
+      "noPersonality": "No personality data",
+      "noInterests": "No interests yet",
+      "noHardSkills": "No hard skills yet",
+      "noSoftSkills": "No soft skills yet",
+      "noProfile": "No profile memory yet. It will appear after conversations are processed."
+    },
+    "recent": {
+      "events": "Recent Events",
+      "episodes": "Recent Episodes",
+      "foresights": "Recent Foresights",
+      "noEvents": "No recent events found.",
+      "noEpisodes": "No episodes yet. Start conversations to build your memory.",
+      "noForesights": "No foresights yet. They will be extracted from your memories."
+    },
+    "memcell": {
+      "count": "memcells",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all",
+      "sourceContent": "Source Content",
+      "keywords": "Keywords",
+      "linkedEpisodes": "Linked Episodes",
+      "moreEpisodes": "more episodes",
+      "openFile": "Open file",
+      "noMemcells": "No memcells found",
+      "noMemcellsDesc": "MemCells are created when you extract memory from files"
+    },
+    "episode": {
+      "count": "episodes",
+      "events": "events",
+      "foresights": "foresights",
+      "source": "Source",
+      "linkedMemories": "Linked memories",
+      "viewSourceMemcell": "View source MemCell",
+      "noEpisodes": "No episodes found"
+    },
+    "event": {
+      "viewEpisode": "View episode",
+      "noEvents": "No event logs found"
+    },
+    "foresight": {
+      "evidence": "Evidence",
+      "noForesights": "No foresights found"
+    },
+    "timeline": {
+      "episode": "Episode",
+      "event": "Event",
+      "foresight": "Foresight",
+      "noEntries": "No timeline entries yet"
+    }
   }
 }
 

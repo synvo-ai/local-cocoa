@@ -1,7 +1,7 @@
 <div align="center">
 <img src="assets/banner/banner.png" alt="Local Cocoa Banner" width="100%">
 
-# 🍫 Local Cocoa: Your Personal AI Assistant, Fully Local 💻
+# 🍫 Local Cocoa: Your Personal Cowork, Fully Local 💻
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![macOS](https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white)]()
@@ -9,7 +9,6 @@
 [![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)]()
 [![Privacy](https://img.shields.io/badge/Privacy-100%25%20Local-success.svg)]()
 [![Powered by](https://img.shields.io/badge/Powered%20by-llama.cpp-blueviolet.svg)](https://github.com/ggerganov/llama.cpp)
-[![i18n](https://img.shields.io/badge/i18n-8%20Languages-blue.svg)](./INTERNATIONALIZATION.md)
 
 </div>
 
@@ -28,11 +27,103 @@ Context sparks insight. Insight powers action.
 
 |                                                     🔍 **File Retrieval**                                                     |                                                   📊 **Year-End Report**                                                    |                                                    ⌨️ **Global Shortcuts**                                                    |
 | :--------------------------------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------------------------------------: | :--------------------------------------------------------------------------------------------------------------------------: |
-| <a href="https://vimeo.com/1151769782"><img src="https://vumbnail.com/1151769782.jpg" width="100%" alt="Retrieval Demo"></a> | <a href="#"><img src="https://placehold.co/600x400/202020/FFFFFF/png?text=Coming+Soon" width="100%" alt="Report Demo"></a> | <a href="#"><img src="https://placehold.co/600x400/202020/FFFFFF/png?text=Coming+Soon" width="100%" alt="Shortcut Demo"></a> |
+| <img src="https://github.com/synvo-ai/local-cocoa/releases/download/0.2.0/demo_search.gif" width="100%" alt="File Retrieval Demo"> | <img src="https://github.com/synvo-ai/local-cocoa/releases/download/0.2.0/demo_scan.gif" width="100%" alt="Year-End Report Demo"> | <img src="https://github.com/synvo-ai/local-cocoa/releases/download/0.2.0/demo_shortcut.gif" width="100%" alt="Global Shortcuts Demo"> |
 |                                            *Instantly chat with your local files*                                            |                                               *Scan 2025 files for insights*                                               |                                                   *Access Synvo anywhere*                                                    |
 
 </div>
 
+
+## Key Features
+
+### 🛡️ Privacy First
+
+- **🔐 Fully Local Privacy**: All inference, indexing, and retrieval run entirely on your device with zero data leaving.
+  - *💡 **Pro Tip**: If you verify network activity using tools like **Little Snitch** (macOS) or **GlassWire** (Windows), you'll confirm that no personal data leaves your device.
+
+### 🧠 Core Intelligence
+
+- **🧠 Multimodal Memory**: Turns documents, images, audio, and video into a persistent semantic memory space.
+- **🔍 Vector-Powered Retrieval**: Local Qdrant search with semantic reranking for precise, high-recall answers.
+- **📁 Intelligent Indexing**: Smartly monitors folders to incrementally index, chunk, and embed efficient vectors.
+- **🖼 Vision Understanding**: Integrated OCR and VLM to extract text and meaning from screenshots and PDFs.
+
+### ⚡ Performance & Experience
+
+- **⚡ Hardware Accelerated**: Optimized `llama.cpp` engine designed for Apple Silicon and consumer GPUs.
+- **🍫 Focused UX**: A calm, responsive interface designed for clarity and seamless interaction.
+- **✍ Integrated Notes**: Write notes that become part of your semantic memory for future recall.
+- **🔁 Auto-Sync**: Automatically detects file changes and keeps your knowledge base fresh.
+
+
+---
+
+## 🏗️ Architecture Overview
+
+Local Cocoa runs entirely on your device. It combines file ingestion, intelligent chunking, and local retrieval to build a private on-device knowledge system.
+
+<div align="center">
+  <img src="assets/architecture/architecture.png" width="800" alt="Local Cocoa Architecture Diagram">
+</div>
+
+**Frontend**: Electron • React • TypeScript • TailwindCSS  
+**Backend**: FastAPI • llama.cpp • Qdrant
+
+
+
+## 🎯 The Ultimate Goal of Local Cocoa
+<div align="center">
+  <img src="assets/vision/vision.png" width="800" alt="Local Cocoa Vision Diagram">
+</div>
+We're actively developing these features—contributions welcome!
+
+- [ ] **👑 More Connectors**: Google Drive, Notion, Slack integration
+- [ ] **🎤 Voice Mode**: Local speech-to-text for voice interaction
+- [ ] **🔌 Plugin Ecosystem**: Open API for community tools and agents
+
+## ✨ Contributors
+
+### 💡 Core Contributors
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/EricFan2002">
+        <img src="https://github.com/EricFan2002.png?size=200" width="80px" style="border-radius:50%;" alt="EricFan2002"/><br />
+        <sub><b>EricFan2002</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/Jingkang50">
+        <img src="https://github.com/Jingkang50.png?size=200" width="80px" style="border-radius:50%;" alt="Jingkang50"/><br />
+        <sub><b>Jingkang50</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/Tom-TaoQin">
+        <img src="https://github.com/Tom-TaoQin.png?size=200" width="80px" style="border-radius:50%;" alt="Tom-TaoQin"/><br />
+        <sub><b>Tom&#8209;TaoQin</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/choiszt">
+        <img src="https://github.com/choiszt.png?size=200" width="80px" style="border-radius:50%;" alt="choiszt"/><br />
+        <sub><b>choiszt</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/KairuiHu">
+        <img src="https://github.com/KairuiHu.png?size=200" width="80px" style="border-radius:50%;" alt="KairuiHu"/><br />
+        <sub><b>KairuiHu</b></sub>
+      </a>
+    </td>
+  </tr>
+</table>
+
+### 🌍 Community Contributors
+
+<a href="https://github.com/synvo-ai/local-cocoa/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=synvo-ai/local-cocoa" />
+</a>
 
 
 ## 🛠️ Quick Start
@@ -159,89 +250,6 @@ This launches the **React Dev Server**, **Electron client**, and **FastAPI backe
 
 ---
 
-## Key Features (Keep Updating)
-
-### 🛡️ Privacy First
-
-- **🔐 Fully Local Privacy**: All inference, indexing, and retrieval run entirely on your device with zero data leaving.
-  - *💡 **Pro Tip**: If you verify network activity using tools like **Little Snitch** (macOS) or **GlassWire** (Windows), you'll confirm that no personal data leaves your device.
-
-### 🧠 Core Intelligence
-
-- **🧠 Multimodal Memory**: Turns documents, images, audio, and video into a persistent semantic memory space.
-- **🔍 Vector-Powered Retrieval**: Local Qdrant search with semantic reranking for precise, high-recall answers.
-- **📁 Intelligent Indexing**: Smartly monitors folders to incrementally index, chunk, and embed efficient vectors.
-- **🖼 Vision Understanding**: Integrated OCR and VLM to extract text and meaning from screenshots and PDFs.
-
-### ⚡ Performance & Experience
-
-- **⚡ Hardware Accelerated**: Optimized `llama.cpp` engine designed for Apple Silicon and consumer GPUs.
-- **🍫 Focused UX**: A calm, responsive interface designed for clarity and seamless interaction.
-- **✍ Integrated Notes**: Write notes that become part of your semantic memory for future recall.
-- **🔁 Auto-Sync**: Automatically detects file changes and keeps your knowledge base fresh.
-
-
----
-
-## 🏗️ Architecture Overview
-
-Local Cocoa runs entirely on your device. It combines file ingestion, intelligent chunking, and local retrieval to build a private on-device knowledge system.
-
-<div align="center">
-  <img src="assets/architecture/architecture.png" width="800" alt="Local Cocoa Architecture Diagram">
-</div>
-
-**Frontend**: Electron • React • TypeScript • TailwindCSS  
-**Backend**: FastAPI • llama.cpp • Qdrant
-
-
-
-
-
-## 🎯 The Ultimate Goal of Local Cocoa
-<div align="center">
-  <img src="assets/vision/vision.png" width="800" alt="Local Cocoa Vision Diagram">
-</div>
-We're actively developing these features—contributions welcome!
-
-- [ ] **👑 More Connectors**: Google Drive, Notion, Slack integration
-- [ ] **🎤 Voice Mode**: Local speech-to-text for voice interaction
-- [ ] **🔌 Plugin Ecosystem**: Open API for community tools and agents
-
-## ✨ Contributors
-
-### 💡 Core Contributors
-
-<a href="https://github.com/EricFan2002">
-  <img src="https://github.com/EricFan2002.png?size=100" width="50px" alt="EricFan2002" />
-</a>
-<a href="https://github.com/Jingkang50">
-  <img src="https://github.com/Jingkang50.png?size=100" width="50px" alt="Jingkang50" />
-</a>
-<a href="https://github.com/Tom-TaoQin">
-  <img src="https://github.com/Tom-TaoQin.png?size=100" width="50px" alt="Tom-TaoQin" />
-</a>
-<a href="https://github.com/choiszt">
-  <img src="https://github.com/choiszt.png?size=100" width="50px" alt="choiszt" />
-</a>
-<a href="https://github.com/KairuiHu">
-  <img src="https://github.com/KairuiHu.png?size=100" width="50px" alt="KairuiHu" />
-</a>
-
-<!-- ### 🌍 Community Contributors
-
-<a href="https://github.com/synvo-ai/local-cocoa/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=synvo-ai/local-cocoa" />
-</a> -->
-
-## 🌍 Internationalization
-
-Local Cocoa supports **8 languages** out of the box:
-
-🇬🇧 English • 🇨🇳 简体中文 • 🇯🇵 日本語 • 🇰🇷 한국어 • 🇫🇷 Français • 🇩🇪 Deutsch • 🇪🇸 Español • 🇷🇺 Русский
-
-**Quick Start**: [INTERNATIONALIZATION.md](./INTERNATIONALIZATION.md)  
-**Full Documentation**: [docs/i18n/](./docs/i18n/)
 
 ## 🤝 Contributing
 

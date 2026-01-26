@@ -148,7 +148,7 @@ Title:`;
     }, []);
 
     const handleSend = useCallback(
-        async (text: string, searchMode: SearchMode = 'auto') => {
+        async (text: string, searchMode: SearchMode = 'auto', useVisionForAnswer: boolean = false) => {
             const api = window.api;
             const timestamp = new Date().toISOString();
             const modelLabel = LOCAL_MODEL_LABEL;
@@ -938,7 +938,7 @@ Title:`;
                         void generateTitle(targetSessionId!, text, currentAnswer);
                     }
                 }
-            }, searchMode);
+            }, searchMode, undefined, useVisionForAnswer);
         },
         [currentSessionId, generateTitle, sessions, config]
     );
@@ -1275,7 +1275,7 @@ Title:`;
                 }
             }, searchMode, token);
         },
-        [currentSessionId, sessions, config, agentContext]
+        [sessions, config, agentContext]
     );
 
     return {

@@ -16,6 +16,9 @@ export type FileIndexStatus = 'pending' | 'indexed' | 'error';
 // 0 = pending, 1 = text done, 2 = embed done, -1 = error, -2 = skipped (deep only)
 export type StageValue = 0 | 1 | 2 | -1 | -2;
 
+// Memory extraction status
+export type MemoryStatus = 'pending' | 'extracting' | 'extracted' | 'skipped' | 'error';
+
 export interface FailedFile {
     path: string;
     reason: string;
@@ -67,6 +70,13 @@ export interface FileRecord {
     deepTextAt?: string | null;
     deepEmbedAt?: string | null;
     
+    // Memory extraction status
+    memoryStatus?: MemoryStatus;
+    memoryExtractedAt?: string | null;
+    memoryTotalChunks?: number;
+    memoryProcessedChunks?: number;
+    memoryLastChunkSize?: number | null;
+
     // Privacy level
     privacyLevel?: PrivacyLevel;
 }

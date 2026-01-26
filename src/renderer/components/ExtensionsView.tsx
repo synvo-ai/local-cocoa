@@ -5,22 +5,27 @@
  * Plugin order and enabled state are configurable in Settings.
  */
 
-import { useState, useCallback, useEffect, useMemo, CSSProperties, ComponentType } from 'react';
-import { Activity, Mail, StickyNote, Puzzle, Brain, Link2, Mic, Loader2, Settings2, X } from 'lucide-react';
+import { useState, useCallback, useEffect, CSSProperties, ComponentType } from 'react';
+import { Activity, Mail, StickyNote, Puzzle, Brain, Link2, Mic, Loader2, Settings2, X, FolderKanban } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { EmailConnectorsPanel } from './EmailConnectorsPanel';
 import { EmailBrowser } from './EmailBrowser';
 import { NotesWorkspace } from './NotesWorkspace';
 import { MCPConnectionPanel } from './MCPConnectionPanel';
 import { PluginConfigPanel } from './PluginConfigPanel';
+import { DesktopOrganizer } from './DesktopOrganizer';
+import { ActivityTimeline } from './ActivityTimeline';
+import { MbtiAnalysis } from './MbtiAnalysis';
+import { EarlogPanel } from './EarlogPanel';
 import { useWorkspaceData } from '../hooks/useWorkspaceData';
 import { useEmailData } from '../hooks/useEmailData';
 import { useNotesData } from '../hooks/useNotesData';
 import { usePluginConfig } from '../hooks/usePluginConfig';
-import type { IndexedFile } from '../types';
+import { useMbtiAnalysis } from '../hooks/useMbtiAnalysis';
 
 // Icon map for dynamic icon lookup
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
+    'Activity': Activity,
     'Mail': Mail,
     'StickyNote': StickyNote,
     'Puzzle': Puzzle,
@@ -28,25 +33,31 @@ const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
     'Link2': Link2,
     'Mic': Mic,
     'Ear': Mic, // Fallback for Ear icon
+    'FolderKanban': FolderKanban,
 };
 
 interface ExtensionsViewProps {
     // Optional props for external control
     initialTab?: string;
-    onOpenFile?: (file: IndexedFile) => void | Promise<void>;
 }
 
 export function ExtensionsView({ 
     initialTab,
-    onOpenFile 
 }: ExtensionsViewProps) {
-    // Load plugin configuration
-    const { enabledTabs, loading: pluginsLoading } = usePluginConfig();
+    // Load plugin configuration - show all enabled tabs
+    // Unsupported tabs will display "Unsupported yet" message when selected
+    const { enabledTabs, loading: pluginsLoading, refresh: refreshPlugins } = usePluginConfig();
     
     const [activeTab, setActiveTab] = useState<string>(initialTab || '');
-    const [isTrackingActivity, setIsTrackingActivity] = useState(false);
     const [notification, setNotification] = useState<{ message: string; action?: { label: string; onClick: () => void } } | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+    // Handler for closing settings panel - refresh data when closing
+    const handleCloseSettings = useCallback(() => {
+        setIsSettingsOpen(false);
+        // Refresh plugin data to ensure UI is in sync
+        refreshPlugins();
+    }, [refreshPlugins]);
 
     const dragStyle = { WebkitAppRegion: 'drag' } as CSSProperties;
     const noDragStyle = { WebkitAppRegion: 'no-drag' } as CSSProperties;
@@ -63,13 +74,11 @@ export function ExtensionsView({
     // Use workspace data hook
     const {
         emailAccounts: workspaceEmailAccounts,
-        files,
         isIndexing,
         emailIndexingByAccount,
         noteIndexingItems,
         noteFolderId,
         refreshData,
-        systemSpecs,
     } = useWorkspaceData();
 
     // Use email data hook
@@ -105,79 +114,28 @@ export function ExtensionsView({
         handleDeleteNote
     } = useNotesData();
 
-    // Context too large error helper
-    const isContextTooLargeError = useCallback((value: unknown) => {
-        const message = (value instanceof Error ? value.message : String(value ?? '')).toLowerCase();
-        return message.includes('exceeds the available context size') || message.includes('available context size');
+    // Activity tracking state
+    const [isActivityTracking, setIsActivityTracking] = useState(false);
+    const handleToggleActivityTracking = useCallback(() => {
+        setIsActivityTracking(prev => !prev);
     }, []);
 
-    const showContextTooLargeWarning = useCallback(() => {
-        setNotification({
-            message: 'This request is too large for the model context window. Try lowering Vision Performance (Max Resolution) or increasing Context Size in Models.',
-            action: {
-                label: 'Model Settings',
-                onClick: () => window.dispatchEvent(new CustomEvent('synvo:navigate', { detail: { view: 'models' } }))
-            }
-        });
-    }, []);
-
-    const openExternalSafe = useCallback(async (url: string) => {
-        try {
-            await window.api?.openExternal?.(url);
-        } catch (error) {
-            console.warn('Failed to open external url:', url, error);
-        }
-    }, []);
-
-    // Activity Tracking Effect
-    useEffect(() => {
-        if (!isTrackingActivity) return;
-
-        const intervalId = window.setInterval(async () => {
-            try {
-                const api = window.api;
-                if (!api?.captureScreen || !api?.ingestScreenshot) return;
-
-                const image = await api.captureScreen();
-                if (image) {
-                    await api.ingestScreenshot(image);
-                }
-            } catch (error) {
-                console.error('Activity tracking error:', error);
-                setIsTrackingActivity(false);
-
-                if (isContextTooLargeError(error)) {
-                    showContextTooLargeWarning();
-                    return;
-                }
-
-                const platform = systemSpecs?.platform;
-                const settingsUrl = platform === 'darwin'
-                    ? 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture'
-                    : platform === 'win32'
-                        ? 'ms-settings:privacy'
-                        : null;
-
-                setNotification({
-                    message: 'Screen capture failed. Please check permissions.',
-                    action: {
-                        label: 'Open Settings',
-                        onClick: () => {
-                            if (settingsUrl) {
-                                void openExternalSafe(settingsUrl);
-                                return;
-                            }
-                            window.dispatchEvent(new CustomEvent('synvo:navigate', { detail: { view: 'settings' } }));
-                        }
-                    }
-                });
-            }
-        }, 30000); // 30 seconds
-
-        return () => {
-            window.clearInterval(intervalId);
-        };
-    }, [isTrackingActivity, openExternalSafe, systemSpecs?.platform, isContextTooLargeError, showContextTooLargeWarning]);
+    // MBTI Analysis hook
+    const {
+        isAnalyzing: isMbtiAnalyzing,
+        isGeneratingReport: isMbtiGeneratingReport,
+        progress: mbtiProgress,
+        result: mbtiResult,
+        error: mbtiError,
+        filterProgress: mbtiFilterProgress,
+        embedProgress: mbtiEmbedProgress,
+        startAnalysis: startMbtiAnalysis,
+        startAnalysisWithFilter: startMbtiAnalysisWithFilter,
+        stopAnalysis: stopMbtiAnalysis,
+        resetAnalysis: resetMbtiAnalysis,
+        setProgress: setMbtiProgress,
+        files: mbtiFiles,
+    } = useMbtiAnalysis();
 
     // Email index handlers
     const handleRescanEmailIndex = useCallback(async (folderId: string) => {
@@ -230,18 +188,6 @@ export function ExtensionsView({
             setNotification({ message: error instanceof Error ? error.message : 'Failed to reindex notes index.' });
         }
     }, [noteFolderId, refreshData]);
-
-    // Default file open handler
-    const handleOpenFile = useCallback(async (file: IndexedFile) => {
-        if (onOpenFile) {
-            await onOpenFile(file);
-        } else {
-            const api = window.api;
-            if (api?.openFile) {
-                await api.openFile(file.fullPath);
-            }
-        }
-    }, [onOpenFile]);
 
     // Get icon component for a tab
     const getTabIcon = useCallback((iconName: string) => {
@@ -315,14 +261,61 @@ export function ExtensionsView({
                     </div>
                 );
             
+            case 'desktop_organizer':
+                return (
+                    <div className="h-full w-full overflow-hidden">
+                        <DesktopOrganizer />
+                    </div>
+                );
+            
+            case 'activity':
+                return (
+                    <div className="h-full w-full overflow-hidden">
+                        <ActivityTimeline
+                            isTracking={isActivityTracking}
+                            onToggleTracking={handleToggleActivityTracking}
+                        />
+                    </div>
+                );
+            
+            case 'earlog':
+                return (
+                    <div className="h-full w-full overflow-hidden">
+                        <EarlogPanel />
+                    </div>
+                );
+            
+            case 'mbti':
+                return (
+                    <div className="h-full w-full overflow-hidden">
+                        <MbtiAnalysis
+                            isAnalyzing={isMbtiAnalyzing}
+                            isGeneratingReport={isMbtiGeneratingReport}
+                            progress={mbtiProgress}
+                            result={mbtiResult}
+                            error={mbtiError}
+                            filterProgress={mbtiFilterProgress}
+                            embedProgress={mbtiEmbedProgress}
+                            onStartAnalysis={startMbtiAnalysis}
+                            onStartAnalysisWithFilter={startMbtiAnalysisWithFilter}
+                            onStopAnalysis={stopMbtiAnalysis}
+                            onResetAnalysis={resetMbtiAnalysis}
+                            setProgress={setMbtiProgress}
+                            files={mbtiFiles}
+                        />
+                    </div>
+                );
+            
             default:
                 // For unknown tabs, show a placeholder
                 return (
                     <div className="h-full w-full flex items-center justify-center text-muted-foreground">
                         <div className="text-center">
-                            <Puzzle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <p>Plugin content not available</p>
-                            <p className="text-sm mt-1">Tab: {activeTab}</p>
+                            <Puzzle className="h-16 w-16 mx-auto mb-6 opacity-40" />
+                            <h3 className="text-xl font-semibold mb-2 text-foreground/70">Unsupported Yet</h3>
+                            <p className="text-sm max-w-md mx-auto">
+                                This extension is not yet supported. Stay tuned for future updates!
+                            </p>
                         </div>
                     </div>
                 );
@@ -349,8 +342,6 @@ export function ExtensionsView({
         handleReindexEmailIndex,
         handleOutlookConnected,
         isIndexing,
-        isTrackingActivity,
-        handleOpenFile,
         notes,
         selectedNoteId,
         selectedNote,
@@ -363,7 +354,23 @@ export function ExtensionsView({
         noteIndexingItems,
         handleRescanNotesIndex,
         handleReindexNotesIndex,
-        files,
+        // Activity dependencies
+        isActivityTracking,
+        handleToggleActivityTracking,
+        // MBTI dependencies
+        isMbtiAnalyzing,
+        isMbtiGeneratingReport,
+        mbtiProgress,
+        mbtiResult,
+        mbtiError,
+        mbtiFilterProgress,
+        mbtiEmbedProgress,
+        startMbtiAnalysis,
+        startMbtiAnalysisWithFilter,
+        stopMbtiAnalysis,
+        resetMbtiAnalysis,
+        setMbtiProgress,
+        mbtiFiles,
     ]);
 
     // Show loading state while plugins are loading
@@ -407,7 +414,7 @@ export function ExtensionsView({
                     <div className="fixed inset-0 z-50">
                         <div 
                             className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
-                            onClick={() => setIsSettingsOpen(false)}
+                            onClick={handleCloseSettings}
                         />
                         <div className="absolute right-0 top-0 h-full w-full max-w-lg bg-background border-l shadow-2xl animate-in slide-in-from-right duration-300">
                             <div className="flex items-center justify-between px-6 py-5 border-b bg-card/50">
@@ -421,7 +428,7 @@ export function ExtensionsView({
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => setIsSettingsOpen(false)}
+                                    onClick={handleCloseSettings}
                                     className="p-2 rounded-lg hover:bg-muted transition-colors"
                                 >
                                     <X className="h-5 w-5" />
@@ -490,6 +497,7 @@ export function ExtensionsView({
                         {enabledTabs.map(tab => {
                             const Icon = getTabIcon(tab.icon);
                             const isActive = activeTab === tab.id;
+                            const isTestMode = ['desktop_organizer', 'activity', 'earlog', 'mbti'].includes(tab.id);
                             return (
                                 <button
                                     key={tab.id}
@@ -506,6 +514,11 @@ export function ExtensionsView({
                                         isActive ? "text-primary" : ""
                                     )} />
                                     {tab.label}
+                                    {isTestMode && (
+                                        <span className="ml-0.5 px-1.5 py-0.5 text-[8px] font-semibold uppercase rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                            Test
+                                        </span>
+                                    )}
                                     {tab.id === 'email' && emailAccounts.length > 0 && (
                                         <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-muted">
                                             {emailAccounts.length}
@@ -537,7 +550,7 @@ export function ExtensionsView({
                     {/* Backdrop */}
                     <div 
                         className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
-                        onClick={() => setIsSettingsOpen(false)}
+                        onClick={handleCloseSettings}
                     />
                     
                     {/* Panel */}
@@ -554,7 +567,7 @@ export function ExtensionsView({
                                 </div>
                             </div>
                             <button
-                                onClick={() => setIsSettingsOpen(false)}
+                                onClick={handleCloseSettings}
                                 className="p-2 rounded-lg hover:bg-muted transition-colors"
                             >
                                 <X className="h-5 w-5" />

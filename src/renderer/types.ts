@@ -1,6 +1,7 @@
 export type {
     FileKind,
     FileIndexStatus,
+    MemoryStatus,
     PrivacyLevel,
     FileRecord,
     FileListResponse,

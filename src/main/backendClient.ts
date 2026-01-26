@@ -2,6 +2,7 @@
 import { app } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import { config } from './config';
 
 import type {
     AgentDiagnostics,
@@ -58,45 +59,20 @@ export interface IndexOperationOptions {
 }
 
 let cachedKey: string | null = null;
-let manualKeyOverride: string | null = null;
 
 export function setSessionToken(token: string): void {
     cachedKey = token;
     console.log('[BackendClient] Session token set');
 }
 
-export function setManualKeyOverride(token: string | null): void {
-    const trimmed = token?.trim();
-    manualKeyOverride = trimmed ? trimmed : null;
-    if (manualKeyOverride) {
-        cachedKey = manualKeyOverride;
-    }
-    console.log('[BackendClient] Manual API key override set:', manualKeyOverride ? 'yes' : 'no');
-}
-
 export function getLocalKey(): string | null {
-    if (manualKeyOverride) return manualKeyOverride;
-
     // Always try to read the key if not cached yet
     if (cachedKey) return cachedKey;
 
-    let ragHome: string;
+    // In production mode, this should never happen
+    if (app.isPackaged) return null;
 
-    // In development mode, use LOCAL_RAG_HOME env var if set
-    // In production (packaged app), always use userData path
-    if (!app.isPackaged && process.env.LOCAL_RAG_HOME) {
-        ragHome = process.env.LOCAL_RAG_HOME;
-    } else {
-        try {
-            const userDataPath = app.getPath('userData');
-            ragHome = path.join(userDataPath, 'local_rag');
-        } catch (e) {
-            console.error('[BackendClient] Failed to get userData path:', e);
-            return null;
-        }
-    }
-
-    const keyPath = path.join(ragHome, 'local_key.txt');
+    const keyPath = path.join(config.paths.runtimeRoot, '.dev-session-key');
     try {
         if (fs.existsSync(keyPath)) {
             const key = fs.readFileSync(keyPath, 'utf-8').trim();
@@ -272,6 +248,19 @@ function mapFile(payload: any): FileRecord & { fullPath?: string; location?: str
         indexStatus: payload.index_status ?? payload.indexStatus ?? 'indexed',
         errorReason: payload.error_reason ?? payload.errorReason ?? null,
         errorAt: payload.error_at ?? payload.errorAt ?? null,
+        // Two-round indexing stages
+        fastStage: payload.fast_stage ?? payload.fastStage ?? 0,
+        fastTextAt: payload.fast_text_at ?? payload.fastTextAt ?? null,
+        fastEmbedAt: payload.fast_embed_at ?? payload.fastEmbedAt ?? null,
+        deepStage: payload.deep_stage ?? payload.deepStage ?? 0,
+        deepTextAt: payload.deep_text_at ?? payload.deepTextAt ?? null,
+        deepEmbedAt: payload.deep_embed_at ?? payload.deepEmbedAt ?? null,
+        // Memory extraction status and progress
+        memoryStatus: payload.memory_status ?? payload.memoryStatus ?? 'pending',
+        memoryExtractedAt: payload.memory_extracted_at ?? payload.memoryExtractedAt ?? null,
+        memoryTotalChunks: payload.memory_total_chunks ?? payload.memoryTotalChunks ?? 0,
+        memoryProcessedChunks: payload.memory_processed_chunks ?? payload.memoryProcessedChunks ?? 0,
+        memoryLastChunkSize: payload.memory_last_chunk_size ?? payload.memoryLastChunkSize ?? null,
         // Extended fields for IndexedFile
         fullPath: payload.full_path ?? payload.fullPath ?? path,
         location: payload.location ?? '',
@@ -536,11 +525,17 @@ export async function getHealth(): Promise<HealthStatus> {
 }
 
 export async function listFolders(): Promise<FolderRecord[]> {
-    const data = await requestJson<{ folders: any[] }>('/folders', { method: 'GET' });
-    console.log('[BackendClient] listFolders raw response:', data);
-    const folders = Array.isArray(data.folders) ? data.folders : [];
-    console.log('[BackendClient] listFolders mapped folders:', folders.length);
-    return folders.map(mapFolder);
+    console.log('[BackendClient] listFolders called...');
+    try {
+        const data = await requestJson<{ folders: any[] }>('/folders', { method: 'GET' });
+        console.log('[BackendClient] listFolders raw response:', data);
+        const folders = Array.isArray(data.folders) ? data.folders : [];
+        console.log('[BackendClient] listFolders mapped folders:', folders.length);
+        return folders.map(mapFolder);
+    } catch (error) {
+        console.error('[BackendClient] listFolders error:', error);
+        throw error;
+    }
 }
 
 export async function addFolder(pathValue: string, label?: string, scanMode?: 'full' | 'manual'): Promise<FolderRecord> {
@@ -925,7 +920,7 @@ export async function searchFilesStream(
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
 
-        // eslint-disable-next-line no-constant-condition
+         
         while (true) {
             const { done, value } = await reader.read();
             if (done) {
@@ -965,9 +960,18 @@ export async function askWorkspaceStream(
     onError: (error: Error) => void,
     onDone: () => void,
     searchMode: 'auto' | 'knowledge' | 'direct' = 'auto',
-    resumeToken?: string
+    resumeToken?: string,
+    useVisionForAnswer?: boolean
 ): Promise<void> {
-    const payload = { query, mode, limit, search_mode: searchMode, resume_token: resumeToken };
+    const payload = { 
+        query, 
+        mode, 
+        limit, 
+        search_mode: searchMode, 
+        resume_token: resumeToken,
+        use_vision_for_answer: useVisionForAnswer ?? false
+    };
+    console.log('[backendClient] askWorkspaceStream payload:', JSON.stringify(payload));
     try {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         const key = getLocalKey();
@@ -992,7 +996,7 @@ export async function askWorkspaceStream(
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
 
-        // eslint-disable-next-line no-constant-condition
+         
         while (true) {
             const { done, value } = await reader.read();
             if (done) {
@@ -1209,11 +1213,34 @@ export interface MemoryEventLog {
 export interface MemorySummary {
     user_id: string;
     profile?: MemoryProfile;
+    memcells_count: number;
     episodes_count: number;
     event_logs_count: number;
     foresights_count: number;
     recent_episodes: MemoryEpisode[];
     recent_foresights: MemoryForesight[];
+}
+
+export interface MemoryMemCell {
+    id: string;
+    user_id: string;
+    original_data: string;
+    summary?: string;
+    subject?: string;
+    file_id?: string;
+    chunk_id?: string;
+    chunk_ordinal?: number;
+    type?: string;
+    keywords?: string[];
+    timestamp: string;
+    created_at?: string;
+    metadata?: Record<string, unknown>;
+}
+
+export interface MemCellDetail {
+    memcell: MemoryMemCell;
+    episodes: MemoryEpisode[];
+    event_logs: MemoryEventLog[];
 }
 
 export async function getMemorySummary(userId: string): Promise<MemorySummary> {
@@ -1242,6 +1269,198 @@ export async function getMemoryForesights(userId: string, limit = 50): Promise<M
     url.searchParams.set('limit', String(limit));
     const data = await requestJson<MemoryForesight[]>(url.toString(), { method: 'GET' });
     return Array.isArray(data) ? data : [];
+}
+
+export async function getMemoryMemcells(userId: string, limit = 50, offset = 0): Promise<MemoryMemCell[]> {
+    const url = new URL(resolveEndpoint(`/memory/${encodeURIComponent(userId)}/memcells`));
+    url.searchParams.set('limit', String(limit));
+    url.searchParams.set('offset', String(offset));
+    const data = await requestJson<MemoryMemCell[]>(url.toString(), { method: 'GET' });
+    return Array.isArray(data) ? data : [];
+}
+
+export async function getMemcellDetail(memcellId: string): Promise<MemCellDetail | null> {
+    try {
+        const data = await requestJson<MemCellDetail>(`/memory/memcells/${encodeURIComponent(memcellId)}`, { method: 'GET' });
+        return data;
+    } catch (error) {
+        console.error(`Failed to get memcell ${memcellId}:`, error);
+        return null;
+    }
+}
+
+export async function getMemcellsByFile(fileId: string, limit = 100): Promise<MemoryMemCell[]> {
+    const url = new URL(resolveEndpoint(`/memory/memcells/by-file/${encodeURIComponent(fileId)}`));
+    url.searchParams.set('limit', String(limit));
+    const data = await requestJson<MemoryMemCell[]>(url.toString(), { method: 'GET' });
+    return Array.isArray(data) ? data : [];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Basic Profile API (LLM-inferred from system data)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface SkillRecord {
+    name: string;
+    level?: string; // beginner/intermediate/advanced
+}
+
+export interface RawSystemData {
+    username: string;
+    computer_name: string;
+    shell: string;
+    language: string;
+    region: string;
+    timezone: string;
+    appearance: string;
+    installed_apps: string[];
+    dev_tools: Array<{ name: string; version: string }>;
+}
+
+export interface ProfileSubtopic {
+    name: string;
+    description?: string;
+    value?: any;
+    confidence?: string; // high, medium, low
+    evidence?: string;
+}
+
+export interface ProfileTopic {
+    topic_id: string;
+    topic_name: string;
+    icon?: string;
+    subtopics: ProfileSubtopic[];
+}
+
+export interface BasicProfile {
+    user_id: string;
+    user_name?: string;
+    // Hierarchical topics (new)
+    topics: ProfileTopic[];
+    // LLM-inferred semantic profile (legacy flat fields)
+    personality: string[];
+    interests: string[];
+    hard_skills: SkillRecord[];
+    soft_skills: SkillRecord[];
+    working_habit_preference: string[];
+    user_goal: string[];
+    motivation_system: string[];
+    value_system: string[];
+    inferred_roles: string[];
+    // Raw system data for reference
+    raw_system_data?: RawSystemData;
+    scanned_at: string;
+}
+
+// Streaming event types for progressive profile generation
+export interface ProfileStreamEvent {
+    type: 'init' | 'topic' | 'complete' | 'error';
+    data: any;
+}
+
+/**
+ * Get cached basic profile (without regenerating).
+ * Returns null if no cached profile exists.
+ */
+export async function getCachedBasicProfile(userId: string): Promise<BasicProfile | null> {
+    try {
+        const data = await requestJson<BasicProfile>(`/memory/basic-profile/${encodeURIComponent(userId)}/cached`, { method: 'GET' });
+        return data;
+    } catch (error) {
+        // 404 means no cached profile
+        if (error instanceof Error && error.message.includes('404')) {
+            return null;
+        }
+        throw error;
+    }
+}
+
+/**
+ * Generate basic profile (always regenerates).
+ * @deprecated Use streamBasicProfile for progressive generation
+ */
+export async function getBasicProfile(userId: string): Promise<BasicProfile> {
+    const data = await requestJson<BasicProfile>(`/memory/basic-profile/${encodeURIComponent(userId)}`, { method: 'GET' });
+    return data;
+}
+
+/**
+ * Stream basic profile generation progressively.
+ * Uses Server-Sent Events to receive topics as they are generated.
+ *
+ * @param userId - User ID
+ * @param onEvent - Callback for each event (init, topic, complete, error)
+ */
+export async function streamBasicProfile(
+    userId: string,
+    onEvent: (event: ProfileStreamEvent) => void
+): Promise<void> {
+    const url = `${API_BASE_URL}/memory/basic-profile/${encodeURIComponent(userId)}/stream`;
+
+    // Build headers with API key
+    const headers: Record<string, string> = {
+        'Accept': 'text/event-stream',
+    };
+    const key = getLocalKey();
+    if (key) {
+        headers['X-API-Key'] = key;
+        headers['X-Request-Source'] = 'local_ui';
+    }
+
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers,
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        if (!response.body) {
+            throw new Error('No response body');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+         
+        while (true) {
+            const { done, value } = await reader.read();
+
+            if (done) {
+                break;
+            }
+
+            buffer += decoder.decode(value, { stream: true });
+
+            // Parse SSE events from buffer
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        onEvent(data);
+
+                        if (data.type === 'complete') {
+                            return;
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse SSE data:', line, e);
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        onEvent({
+            type: 'error',
+            data: { error: String(error) }
+        });
+        throw error;
+    }
 }
 
 // ========================================
@@ -1419,4 +1638,126 @@ export async function getOrCreateApiKey(name: string): Promise<ApiKeyRecord> {
         return existing;
     }
     return createApiKey(name);
+}
+
+// ========================================
+// Memory Extraction
+// ========================================
+
+export interface ExtractMemoryResponse {
+    success: boolean;
+    file_id: string;
+    message: string;
+    memcells_created: number;
+    episodes_created: number;
+    event_logs_created: number;
+    foresights_created: number;
+}
+
+/**
+ * Manually trigger memory extraction for a specific file.
+ * @param force If true, re-extract even if already processed (no resume)
+ * @param chunkSize Custom chunk size in chars. If set, concatenates all text and re-chunks
+ */
+export async function extractMemoryForFile(
+    fileId: string, 
+    userId: string = 'default_user', 
+    force: boolean = false,
+    chunkSize?: number
+): Promise<ExtractMemoryResponse> {
+    const body: Record<string, unknown> = { file_id: fileId, user_id: userId, force };
+    if (chunkSize && chunkSize > 0) {
+        body.chunk_size = chunkSize;
+    }
+    return requestJson<ExtractMemoryResponse>('/memory/extract', {
+        method: 'POST',
+        body: JSON.stringify(body),
+    });
+}
+
+export interface PauseMemoryResponse {
+    success: boolean;
+    file_id: string;
+    message: string;
+}
+
+/**
+ * Pause memory extraction for a specific file.
+ * Progress is saved and can be resumed later.
+ */
+export async function pauseMemoryForFile(fileId: string): Promise<PauseMemoryResponse> {
+    return requestJson<PauseMemoryResponse>('/memory/pause', {
+        method: 'POST',
+        body: JSON.stringify({ file_id: fileId }),
+    });
+}
+
+// ========================================
+// Backend Settings
+// ========================================
+
+export interface BackendSettings {
+    vision_max_pixels: number;
+    video_max_pixels: number;
+    embed_batch_size: number;
+    embed_batch_delay_ms: number;
+    vision_batch_delay_ms: number;
+    search_result_limit: number;
+    qa_context_limit: number;
+    max_snippet_length: number;
+    summary_max_tokens: number;
+    pdf_one_chunk_per_page: boolean;
+    rag_chunk_size: number;
+    rag_chunk_overlap: number;
+    default_indexing_mode: 'fast' | 'deep';
+    enable_memory_extraction: boolean;
+    memory_extraction_stage: 'fast' | 'deep' | 'none';
+    memory_chunk_size: number;
+}
+
+/**
+ * Get all backend settings
+ */
+export async function getBackendSettings(): Promise<BackendSettings> {
+    return requestJson<BackendSettings>('/settings');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Backend Spawn Management (Managed by Python process)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Get status of a specific spawn.
+ */
+export async function getBackendSpawnStatus(alias: string): Promise<{ alias: string; running: boolean }> {
+    return requestJson<{ alias: string; running: boolean }>(`/spawns/status/${encodeURIComponent(alias)}`, {
+        method: 'GET'
+    });
+}
+
+/**
+ * Get status of all spawns.
+ */
+export async function getAllBackendSpawnsStatus(): Promise<{ alias: string; running: boolean }[]> {
+    return requestJson<{ alias: string; running: boolean }[]>('/spawns/status', {
+        method: 'GET'
+    });
+}
+
+/**
+ * Stop all spawns managed by the Python process.
+ */
+export async function stopAllBackendSpawns(): Promise<void> {
+    await requestJson('/spawns/stop-all', {
+        method: 'POST'
+    });
+}
+
+/**
+ * Tell Python to ensure all spawns are started (e.g. after a model download).
+ */
+export async function ensureBackendSpawnsReady(): Promise<void> {
+    await requestJson('/spawns/start-all', {
+        method: 'POST'
+    });
 }

@@ -1,17 +1,15 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import tailwindcss from 'tailwindcss';
+import tailwindcss from '@tailwindcss/vite';
 import autoprefixer from 'autoprefixer';
 
 export default defineConfig({
     root: path.resolve(__dirname, 'src/renderer'),
-    envDir: path.resolve(__dirname, 'config'),
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
     css: {
         postcss: {
             plugins: [
-                tailwindcss(),
                 autoprefixer(),
             ],
         },
@@ -23,7 +21,7 @@ export default defineConfig({
         strictPort: true
     },
     build: {
-        outDir: path.resolve(__dirname, 'dist-electron/renderer'),
+        outDir: 'dist/renderer',
         emptyOutDir: true
     },
     resolve: {

@@ -1,16 +1,14 @@
 {
     "name": "local-cocoa",
     "productName": "Local Cocoa",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "private": true,
     "description": "Local Cocoa personal agent with React renderer and FastAPI backend",
     "main": "dist-electron/main/main.js",
     "scripts": {
         "dev": "concurrently \"npm:dev:renderer\" \"npm:dev:electron\"",
         "dev:renderer": "vite --mode dev",
-        "dev:electron": "cross-env NODE_ENV=dev electron scripts/electron-dev-entry.js",
-        "dev:backend": "node scripts/launch-backend.js dev",
-        "env:setup": "powershell -ExecutionPolicy Bypass -File scripts/win/setup_env.ps1",
+        "dev:electron": "cross-env NODE_ENV=dev electron --trace-deprecation scripts/electron-dev-entry.js",
         "models:download": "node scripts/download_tiny_models.js",
         "services:lite": "node scripts/start-lite-server.js",
         "build": "npm run build:renderer && npm run build:electron",
@@ -19,15 +17,12 @@
         "typecheck": "tsc --noEmit",
         "lint": "eslint . --ext .ts,.tsx",
         "lint:fix": "eslint . --ext .ts,.tsx --fix",
-        "test": "npm run typecheck",
+        "prepare": "husky",
         "preview": "npm run build && electron dist-electron/main/main.js",
         "dist": "bash runtime/local_rag_dist/run.sh",
-        "dist:package": "node scripts/package-backend.js",
-        "dist:prep": "npm run build && npm run dist:package",
-        "dist:dmg": "npm run dist:prep && electron-builder --mac dmg",
-        "dist:dmg-debug": "npm run dist:prep && electron-builder --mac dmg -c.mac.identity=null",
-        "dist:exe": "npm run dist:prep && electron-builder --win nsis",
-        "prepare": "husky"
+        "dist:dmg": "npm run build && electron-builder --mac dmg",
+        "dist:dmg-debug": "npm run build && electron-builder --mac dmg -c.mac.identity=null",
+        "dist:exe": "npm run build && electron-builder --win nsis"
     },
     "lint-staged": {
         "*.{ts,tsx}": [
@@ -36,50 +31,55 @@
         ]
     },
     "dependencies": {
+        "@tailwindcss/vite": "^4.1.18",
         "archiver": "^7.0.1",
         "clsx": "^2.1.1",
         "dotenv": "^17.2.3",
         "dotenv-expand": "^12.0.3",
         "electron-log": "^5.4.3",
         "html2canvas": "^1.4.1",
-        "i18next": "^25.7.4",
+        "i18next": "^25.8.0",
         "i18next-browser-languagedetector": "^8.2.0",
-        "lucide-react": "^0.561.0",
+        "lucide-react": "^0.562.0",
         "proxy-agent": "^6.5.0",
-        "react": "^18.3.1",
-        "react-dom": "^18.3.1",
-        "react-i18next": "^16.5.2",
-        "react-markdown": "^9.0.3",
+        "react": "^19.2.3",
+        "react-dom": "^19.2.3",
+        "react-i18next": "^16.5.3",
+        "react-markdown": "^10.1.0",
         "tailwind-merge": "^3.4.0"
     },
     "devDependencies": {
-        "@electron/notarize": "^2.3.0",
+        "@electron/notarize": "^3.1.1",
+        "@eslint/compat": "^2.0.1",
+        "@eslint/eslintrc": "^3.3.3",
+        "@eslint/js": "^9.39.2",
         "@types/archiver": "^7.0.0",
-        "@types/node": "^20.11.30",
-        "@types/react": "^18.3.3",
-        "@types/react-dom": "^18.3.3",
-        "@typescript-eslint/eslint-plugin": "^7.9.0",
-        "@typescript-eslint/parser": "^7.9.0",
-        "@vitejs/plugin-react": "^4.2.1",
-        "autoprefixer": "^10.4.19",
-        "concurrently": "^8.2.2",
-        "cross-env": "^7.0.3",
+        "@types/node": "^25.0.10",
+        "@types/react": "^19.2.9",
+        "@types/react-dom": "^19.2.3",
+        "@typescript-eslint/eslint-plugin": "^8.53.1",
+        "@typescript-eslint/parser": "^8.53.1",
+        "@vitejs/plugin-react": "^5.1.2",
+        "autoprefixer": "^10.4.23",
+        "concurrently": "^9.2.1",
+        "cross-env": "^10.1.0",
         "dotenv-expand": "^12.0.3",
-        "electron": "^29.1.5",
-        "electron-builder": "^24.13.3",
-        "eslint": "^8.57.0",
-        "eslint-config-prettier": "^9.1.0",
-        "eslint-plugin-react": "^7.34.1",
-        "eslint-plugin-react-hooks": "^4.6.0",
-        "eslint-plugin-react-refresh": "^0.4.6",
+        "electron": "^40.0.0",
+        "electron-builder": "^26.5.0",
+        "eslint": "^9.39.2",
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-react": "^7.37.5",
+        "eslint-plugin-react-hooks": "^7.0.1",
+        "eslint-plugin-react-refresh": "^0.4.26",
+        "globals": "^17.1.0",
         "husky": "^9.1.7",
-        "lint-staged": "^15.5.2",
-        "postcss": "^8.4.38",
-        "tailwindcss": "^3.4.4",
+        "lint-staged": "^16.2.7",
+        "postcss": "^8.5.6",
+        "tailwindcss": "^4.1.18",
         "ts-node": "^10.9.2",
-        "typescript": "^5.4.5",
-        "vite": "^5.2.8",
-        "vitest": "^3.2.4"
+        "typescript": "^5.9.3",
+        "vite": "^7.3.1",
+        "vitest": "^4.0.18"
     },
     "engines": {
         "node": ">=18.17.0"
@@ -101,28 +101,12 @@
         ],
         "extraResources": [
             {
-                "from": "runtime/local_rag_dist",
-                "to": "local_rag_dist"
+                "from": "runtime/local-cocoa-server",
+                "to": "local-cocoa-server"
             },
             {
                 "from": "plugins",
                 "to": "plugins"
-            },
-            {
-                "from": "scripts/linux/start-lite-server-tiny.sh",
-                "to": "scripts/start-lite-server-tiny.sh"
-            },
-            {
-                "from": "scripts/win/start-lite-server-tiny.ps1",
-                "to": "scripts/start-lite-server-tiny.ps1"
-            },
-            {
-                "from": "scripts/linux/download_tiny_models.sh",
-                "to": "scripts/download_tiny_models.sh"
-            },
-            {
-                "from": "scripts/win/download_tiny_models.ps1",
-                "to": "scripts/download_tiny_models.ps1"
             },
             {
                 "from": "runtime/llama-cpp/bin",
@@ -150,8 +134,7 @@
         "win": {
             "icon": "assets/icon.png",
             "target": "nsis",
-            "verifyUpdateCodeSignature": false,
-            "sign": null
+            "verifyUpdateCodeSignature": false
         },
         "nsis": {
             "oneClick": false,

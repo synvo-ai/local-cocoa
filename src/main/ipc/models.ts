@@ -1,10 +1,9 @@
 import { ipcMain } from 'electron';
 import { ModelManager } from '../modelManager';
-import { ServiceManager } from '../serviceManager';
 import { updateSettings } from '../backendClient';
 import { setDebugMode } from '../debug';
 
-export function registerModelHandlers(modelManager: ModelManager, serviceManager: ServiceManager) {
+export function registerModelHandlers(modelManager: ModelManager) {
     ipcMain.handle('models:status', async () => modelManager.getStatus());
     ipcMain.handle('models:download', async () => modelManager.downloadMissing());
     ipcMain.handle('models:redownload', async (_event, assetId: string) => modelManager.redownloadAsset(assetId));
@@ -48,8 +47,26 @@ export function registerModelHandlers(modelManager: ModelManager, serviceManager
             settingsToUpdate.pdf_one_chunk_per_page = newConfig.pdfOneChunkPerPage;
         }
 
+        // New fields for internal Python service management
+        if (oldConfig.activeModelId !== newConfig.activeModelId) {
+            settingsToUpdate.active_model_id = newConfig.activeModelId;
+        }
+        if (oldConfig.activeEmbeddingModelId !== newConfig.activeEmbeddingModelId) {
+            settingsToUpdate.active_embedding_model_id = newConfig.activeEmbeddingModelId;
+        }
+        if (oldConfig.activeRerankerModelId !== newConfig.activeRerankerModelId) {
+            settingsToUpdate.active_reranker_model_id = newConfig.activeRerankerModelId;
+        }
+        if (oldConfig.activeAudioModelId !== newConfig.activeAudioModelId) {
+            settingsToUpdate.active_audio_model_id = newConfig.activeAudioModelId;
+        }
+        if (oldConfig.contextSize !== newConfig.contextSize) {
+            settingsToUpdate.llm_context_tokens = newConfig.contextSize;
+        }
+
         if (Object.keys(settingsToUpdate).length > 0) {
             try {
+                // Python's settings router now handles restarting services if these fields change
                 await updateSettings(settingsToUpdate);
             } catch (err) {
                 console.error('Failed to update backend settings:', err);
@@ -59,84 +76,6 @@ export function registerModelHandlers(modelManager: ModelManager, serviceManager
         // Update debug mode if changed (takes effect immediately for new logs)
         if (oldConfig.debugMode !== newConfig.debugMode) {
             setDebugMode(newConfig.debugMode ?? false);
-        }
-
-        // Only restart VLM if context size or model changed
-        if (oldConfig.contextSize !== newConfig.contextSize || oldConfig.activeModelId !== newConfig.activeModelId) {
-            await serviceManager.stopService('vlm');
-            // Restart with new config
-            const modelPath = modelManager.getModelPath(newConfig.activeModelId);
-            const descriptor = modelManager.getDescriptor(newConfig.activeModelId);
-
-            // Resolve mmproj path - use mmprojId from descriptor if available
-            let mmprojPath: string | undefined;
-            if (descriptor?.type === 'vlm' || descriptor?.id === 'vlm') {
-                if (descriptor.mmprojId) {
-                    mmprojPath = modelManager.getModelPath(descriptor.mmprojId);
-                } else {
-                    mmprojPath = modelManager.getModelPath('vlm-mmproj');
-                }
-            }
-
-            await serviceManager.startService({
-                alias: 'vlm',
-                modelPath: modelPath,
-                port: 8007,
-                contextSize: newConfig.contextSize,
-                threads: 4,
-                ngl: 999,
-                type: 'vlm',
-                mmprojPath: mmprojPath
-            });
-        }
-
-        // Restart embedding service if embedding model changed
-        if (oldConfig.activeEmbeddingModelId !== newConfig.activeEmbeddingModelId) {
-            console.log('[Models IPC] Embedding model changed, restarting service...');
-            await serviceManager.stopService('embedding');
-            const embeddingModelId = newConfig.activeEmbeddingModelId || 'embedding-q4';
-            await serviceManager.startService({
-                alias: 'embedding',
-                modelPath: modelManager.getModelPath(embeddingModelId),
-                port: 8005,
-                contextSize: 8192,
-                threads: 2,
-                ngl: 999,
-                type: 'embedding'
-            });
-        }
-
-        // Restart reranker service if reranker model changed
-        if (oldConfig.activeRerankerModelId !== newConfig.activeRerankerModelId) {
-            console.log('[Models IPC] Reranker model changed, restarting service...');
-            await serviceManager.stopService('reranker');
-            const rerankerModelId = newConfig.activeRerankerModelId || 'reranker';
-            await serviceManager.startService({
-                alias: 'reranker',
-                modelPath: modelManager.getModelPath(rerankerModelId),
-                port: 8006,
-                contextSize: 4096,
-                threads: 2,
-                ngl: 999,
-                type: 'reranking',
-                ubatchSize: 2048
-            });
-        }
-
-        // Restart whisper service if audio model changed
-        if (oldConfig.activeAudioModelId !== newConfig.activeAudioModelId) {
-            console.log('[Models IPC] Audio model changed, restarting whisper service...');
-            await serviceManager.stopService('whisper');
-            const audioModelId = newConfig.activeAudioModelId || 'whisper-small';
-            await serviceManager.startService({
-                alias: 'whisper',
-                modelPath: modelManager.getModelPath(audioModelId),
-                port: 8080,
-                contextSize: 0,
-                threads: 4,
-                ngl: 0,
-                type: 'whisper'
-            });
         }
 
         return newConfig;

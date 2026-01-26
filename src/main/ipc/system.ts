@@ -4,9 +4,11 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { createWriteStream } from 'fs';
 import archiver from 'archiver';
-import { getHealth, getLocalKey, setManualKeyOverride } from '../backendClient';
+import { getHealth, getLocalKey } from '../backendClient';
 import { WindowManager } from '../windowManager';
 import { getLogsDirectory } from '../logger';
+import { config } from '../config';
+import { getRuntimeStatus } from '../runtimeMigration';
 
 type RedactionResult = { text: string; redactions: number };
 
@@ -61,11 +63,6 @@ export function registerSystemHandlers(windowManager: WindowManager) {
 
     ipcMain.handle('auth:get-local-key', async () => {
         return getLocalKey();
-    });
-
-    ipcMain.handle('auth:set-local-key', async (_event, key: string | null) => {
-        setManualKeyOverride(key);
-        return true;
     });
 
     ipcMain.handle('system:open-external', async (_event, url: string) => {
@@ -190,25 +187,9 @@ export function registerSystemHandlers(windowManager: WindowManager) {
             }
         }
         
-        const ragHome = path.join(app.getPath('userData'), 'local_rag');
-        if (fs.existsSync(ragHome)) {
-            const logsSubdir = path.join(ragHome, 'logs');
-            if (fs.existsSync(logsSubdir)) {
-                const files = fs.readdirSync(logsSubdir);
-                for (const file of files) {
-                    if (file.endsWith('.log')) {
-                        logFiles.push({
-                            path: path.join(logsSubdir, file),
-                            name: `backend/${file}`
-                        });
-                    }
-                }
-            }
-        }
-        
         const userDataLogFiles = ['main.log', 'renderer.log'];
         for (const logFile of userDataLogFiles) {
-            const logPath = path.join(app.getPath('userData'), logFile);
+            const logPath = path.join(path.dirname(config.paths.electronLogPath), logFile);
             if (fs.existsSync(logPath)) {
                 logFiles.push({
                     path: logPath,
@@ -312,5 +293,10 @@ export function registerSystemHandlers(windowManager: WindowManager) {
     // Get logs directory path (for UI to show location)
     ipcMain.handle('system:get-logs-path', async () => {
         return getLogsDirectory();
+    });
+
+    // Get runtime status for debugging
+    ipcMain.handle('system:get-runtime-status', async () => {
+        return getRuntimeStatus();
     });
 }

@@ -5,12 +5,6 @@ const dotenvExpand = require('dotenv-expand');
 
 const rootDir = path.resolve(__dirname, '..');
 
-// Load .env configuration
-dotenvExpand.expand(dotenv.config({ path: path.join(rootDir, 'config', `.env`) }));
-dotenvExpand.expand(dotenv.config({ path: path.join(rootDir, 'config', `.env.dev`) }));
-// Environment variables will be loaded by loadEnvironment() in main.ts
-// This entry point only handles ts-node setup for dev mode
-
 if (process.platform === 'darwin') {
     app.setName('Local Cocoa');
 }

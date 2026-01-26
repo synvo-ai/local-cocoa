@@ -18,12 +18,7 @@ export class MCPServer {
 
     constructor() {
         // Path to the MCP server module (now under plugins/mcp/backend)
-        if (config.isDev) {
-            this.serverPath = path.join(config.projectRoot, 'plugins', 'mcp', 'backend');
-        } else {
-            // In production, look for bundled MCP server
-            this.serverPath = path.join(process.resourcesPath, 'plugins', 'mcp', 'backend');
-        }
+        this.serverPath = path.join(config.paths.resourceRoot, 'plugins', 'mcp', 'backend')
     }
 
     /**
@@ -34,10 +29,10 @@ export class MCPServer {
 
         // Check for virtual environment in project
         const venvPaths = [
-            path.join(config.projectRoot, '.venv', 'bin', 'python'),
-            path.join(config.projectRoot, '.venv', 'Scripts', 'python.exe'),
-            path.join(config.projectRoot, 'venv', 'bin', 'python'),
-            path.join(config.projectRoot, 'venv', 'Scripts', 'python.exe'),
+            path.join(config.paths.projectRoot, '.venv', 'bin', 'python'),
+            path.join(config.paths.projectRoot, '.venv', 'Scripts', 'python.exe'),
+            path.join(config.paths.projectRoot, 'venv', 'bin', 'python'),
+            path.join(config.paths.projectRoot, 'venv', 'Scripts', 'python.exe'),
         ];
 
         for (const venvPath of venvPaths) {
@@ -108,29 +103,13 @@ export class MCPServer {
             // Read API key - try dev session key first, then legacy paths
             let apiKey = '';
             
-            // Priority 1: Dev session key file (new pattern)
-            const devSessionKeyPath = path.join(config.projectRoot, '.dev-session-key');
+            const devSessionKeyPath = path.join(config.paths.runtimeRoot, '.dev-session-key');
             if (fs.existsSync(devSessionKeyPath)) {
                 try {
                     apiKey = fs.readFileSync(devSessionKeyPath, 'utf-8').trim();
                     debugLog(`Using dev session key from: ${devSessionKeyPath}`);
                 } catch {
                     // Ignore read errors
-                }
-            }
-            
-            // Priority 2: Legacy production path
-            if (!apiKey) {
-                const userDataPath = app.getPath('userData');
-                const ragHome = path.join(userDataPath, 'local_rag');
-                const keyPath = path.join(ragHome, 'local_key.txt');
-                if (fs.existsSync(keyPath)) {
-                    try {
-                        apiKey = fs.readFileSync(keyPath, 'utf-8').trim();
-                        debugLog(`Using legacy key from: ${keyPath}`);
-                    } catch {
-                        // Ignore read errors
-                    }
                 }
             }
 

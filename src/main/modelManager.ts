@@ -4,7 +4,8 @@ import { createWriteStream } from 'fs';
 import path from 'path';
 import http from 'http';
 import https from 'https';
-import { app, net } from 'electron';
+import { net } from 'electron';
+import { config } from './config';
 import ProxyAgent from 'proxy-agent';
 import type { ModelAssetStatus, ModelDownloadEvent, ModelStatusSummary } from '../types/files';
 
@@ -18,7 +19,7 @@ type ModelAssetDescriptor = {
     mmprojId?: string;
 };
 
-interface ModelConfig {
+export interface ModelConfig {
     activeModelId: string;
     activeEmbeddingModelId: string;
     activeRerankerModelId: string;
@@ -41,8 +42,7 @@ interface ModelConfig {
 
 export class ModelManager extends EventEmitter {
     private readonly modelRootPath: string;
-    private readonly projectRoot: string;
-    private readonly configPath: string;
+    private readonly userConfigPath: string;
     private readonly modelsConfigPath: string;
     private activeDownload: Promise<ModelStatusSummary> | null = null;
     private descriptors: ModelAssetDescriptor[] = [];
@@ -63,18 +63,20 @@ export class ModelManager extends EventEmitter {
         embedBatchSize: 10,
         embedBatchDelayMs: 10,
         visionBatchDelayMs: 200,
-        debugMode: true
+        debugMode: config.debugMode
     };
     public readonly initializePromise: Promise<void>;
 
-    constructor(projectRoot: string, modelRoot?: string) {
+    get modelRoot(): string {
+        return this.modelRootPath;
+    }
+
+    constructor(modelRoot: string) {
         super();
-        this.projectRoot = projectRoot;
+        this.modelRootPath = modelRoot;
 
-        this.modelRootPath = modelRoot ? modelRoot : path.join(app.getPath('userData'), 'local-cocoa-models', 'pretrained');
-
-        this.configPath = path.join(app.getPath('userData'), 'model-config.json');
-        this.modelsConfigPath = path.join(projectRoot, 'config', 'models.config.json');
+        this.userConfigPath = path.join(this.modelRootPath, 'user.config.json');
+        this.modelsConfigPath = path.join(config.paths.projectRoot, 'config', 'models.config.json');
 
         console.log('[ModelManager] Initialized');
         console.log('[ModelManager] Model Root:', this.modelRootPath);
@@ -103,7 +105,7 @@ export class ModelManager extends EventEmitter {
 
     private async loadConfig() {
         try {
-            const data = await fs.readFile(this.configPath, 'utf-8');
+            const data = await fs.readFile(this.userConfigPath, 'utf-8');
             this.config = { ...this.config, ...JSON.parse(data) };
         } catch {
             // Ignore error, use defaults
@@ -112,7 +114,7 @@ export class ModelManager extends EventEmitter {
 
     private async saveConfig() {
         try {
-            await fs.writeFile(this.configPath, JSON.stringify(this.config, null, 2));
+            await fs.writeFile(this.userConfigPath, JSON.stringify(this.config, null, 2));
         } catch (error) {
             console.error('Failed to save model config:', error);
         }

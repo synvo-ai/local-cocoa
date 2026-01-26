@@ -138,6 +138,88 @@
     "stopAnalysis": "停止分析",
     "analyzing": "分析中...",
     "generatingReport": "生成报告中..."
+  },
+  "memory": {
+    "title": "用户记忆",
+    "subtitle": "查看和管理您的个人记忆与洞察",
+    "refresh": "刷新",
+    "tabs": {
+      "overview": "概览",
+      "memcells": "记忆单元",
+      "episodes": "情景记忆",
+      "events": "事件日志",
+      "foresights": "前瞻记忆",
+      "timeline": "时间线"
+    },
+    "filters": {
+      "searchPlaceholder": "搜索记忆...",
+      "allTime": "全部时间",
+      "newestFirst": "最新优先",
+      "oldestFirst": "最早优先",
+      "linkedOnly": "仅显示关联"
+    },
+    "stats": {
+      "memcells": "记忆单元",
+      "episodes": "情景记忆",
+      "eventLogs": "事件日志",
+      "foresights": "前瞻记忆"
+    },
+    "profile": {
+      "title": "用户画像",
+      "memory": "用户画像记忆",
+      "personality": "性格特征",
+      "interests": "兴趣爱好",
+      "hardSkills": "专业技能",
+      "softSkills": "软技能",
+      "noPersonality": "暂无性格数据",
+      "noInterests": "暂无兴趣数据",
+      "noHardSkills": "暂无专业技能数据",
+      "noSoftSkills": "暂无软技能数据",
+      "noProfile": "暂无用户画像。对话处理后将自动生成。"
+    },
+    "recent": {
+      "events": "最近事件",
+      "episodes": "最近情景",
+      "foresights": "最近前瞻",
+      "noEvents": "暂无最近事件。",
+      "noEpisodes": "暂无情景记忆。开始对话以构建您的记忆。",
+      "noForesights": "暂无前瞻记忆。它们将从您的记忆中提取。"
+    },
+    "memcell": {
+      "count": "个记忆单元",
+      "collapseAll": "全部折叠",
+      "expandAll": "全部展开",
+      "sourceContent": "源内容",
+      "keywords": "关键词",
+      "linkedEpisodes": "关联情景",
+      "moreEpisodes": "更多情景",
+      "openFile": "打开文件",
+      "noMemcells": "暂无记忆单元",
+      "noMemcellsDesc": "从文件提取记忆后将创建记忆单元"
+    },
+    "episode": {
+      "count": "个情景",
+      "events": "个事件",
+      "foresights": "个前瞻",
+      "source": "来源",
+      "linkedMemories": "关联记忆",
+      "viewSourceMemcell": "查看源记忆单元",
+      "noEpisodes": "暂无情景记忆"
+    },
+    "event": {
+      "viewEpisode": "查看情景",
+      "noEvents": "暂无事件日志"
+    },
+    "foresight": {
+      "evidence": "依据",
+      "noForesights": "暂无前瞻记忆"
+    },
+    "timeline": {
+      "episode": "情景",
+      "event": "事件",
+      "foresight": "前瞻",
+      "noEntries": "暂无时间线记录"
+    }
   }
 }
 

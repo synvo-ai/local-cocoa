@@ -669,7 +669,7 @@ export function MonitoredFoldersPanel({
                                                                             handleFileIndex(file.fullPath, 'deep');
                                                                         }}
                                                                         className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/50 transition-colors"
-                                                                        title="Upgrade to Deep index"
+                                                                        title="Deep Index index"
                                                                     >
                                                                         <ArrowUp className="h-3 w-3" />
                                                                         Deep

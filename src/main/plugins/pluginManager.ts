@@ -9,7 +9,7 @@
  * - Scoped storage for each plugin
  */
 
-import { app, BrowserWindow, BrowserView, ipcMain, session, shell } from 'electron';
+import { BrowserWindow, BrowserView, ipcMain, session } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { EventEmitter } from 'events';
@@ -18,7 +18,6 @@ import type {
     PluginManifest,
     PluginInstance,
     PluginRegistry,
-    PluginStatus,
     PluginUIEntry,
     PluginSystemEvent
 } from './types';
@@ -41,7 +40,6 @@ export class PluginManager extends EventEmitter {
         uiEntries: new Map()
     };
     
-    private projectRoot: string;
     private pluginsPath: string;
     private userDataPath: string;
     private pluginViews: Map<string, BrowserView> = new Map();
@@ -49,13 +47,11 @@ export class PluginManager extends EventEmitter {
     private mainWindow: BrowserWindow | null = null;
     private pluginsConfig: PluginsUserConfig | null = null;
     
-    constructor(projectRoot: string) {
+    constructor() {
         super();
-        this.projectRoot = projectRoot;
-        this.userDataPath = app.getPath('userData');
-        
-        // This aligns with the backend which also looks for plugins in <resources>/plugins
-        this.pluginsPath = path.join( config.isDev ? config.projectRoot : process.resourcesPath, PLUGINS_DIR);
+        this.userDataPath = config.paths.runtimeRoot;
+    
+        this.pluginsPath = path.join( config.paths.resourceRoot, PLUGINS_DIR);
         
         // Ensure plugins directory exists
         if (!fs.existsSync(this.pluginsPath)) {
@@ -396,6 +392,7 @@ export class PluginManager extends EventEmitter {
      * Install a plugin from a .zip file
      */
     async installPlugin(zipPath: string): Promise<{ success: boolean; pluginId?: string; error?: string }> {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const AdmZip = require('adm-zip');
         
         try {
@@ -528,7 +525,7 @@ export class PluginManager extends EventEmitter {
     /**
      * Create a sandboxed webview for a plugin
      */
-    createPluginView(pluginId: string, parentWindow: BrowserWindow): BrowserView | null {
+    createPluginView(pluginId: string, _parentWindow: BrowserWindow): BrowserView | null {
         const plugin = this.registry.plugins.get(pluginId);
         if (!plugin || !plugin.manifest.frontend) {
             console.error(`[PluginManager] Cannot create view for plugin ${pluginId}: no frontend`);
@@ -546,7 +543,7 @@ export class PluginManager extends EventEmitter {
                 sandbox: true,
                 preload: plugin.manifest.frontend.preloadScript 
                     ? path.join(plugin.path, 'frontend', plugin.manifest.frontend.preloadScript)
-                    : path.join(this.projectRoot, 'dist-electron', 'preload', 'pluginPreload.js'),
+                    : path.join(config.paths.resourceRoot, 'dist-electron', 'preload', 'pluginPreload.js'),
                 session: pluginSession,
                 additionalArguments: [`--plugin-id=${pluginId}`]
             }
@@ -893,29 +890,8 @@ export class PluginManager extends EventEmitter {
             }
         });
         
-        // ========== System Utility Handlers (for plugins) ==========
-        
-        // Open external URL (sandboxed - plugins can't use shell directly)
-        ipcMain.handle('system:open-external', async (_event, url: string) => {
-            try {
-                await shell.openExternal(url);
-                return true;
-            } catch (error) {
-                console.error('[PluginManager] Failed to open external URL:', error);
-                return false;
-            }
-        });
-        
-        // Get system specs (limited info for plugins)
-        ipcMain.handle('system:specs', () => {
-            const os = require('os');
-            return {
-                totalMemory: os.totalmem(),
-                platform: process.platform,
-                arch: process.arch,
-                cpus: os.cpus().length
-            };
-        });
+        // Note: system:open-external and system:specs handlers are registered in
+        // src/main/ipc/system.ts to avoid duplicate registration
     }
 }
 
@@ -926,10 +902,11 @@ export function getPluginManager(): PluginManager | null {
     return pluginManagerInstance;
 }
 
-export function initPluginManager(projectRoot: string): PluginManager {
+export function initPluginManager(): PluginManager {
     if (!pluginManagerInstance) {
-        pluginManagerInstance = new PluginManager(projectRoot);
+        pluginManagerInstance = new PluginManager();
     }
     return pluginManagerInstance;
 }
+
 

@@ -164,13 +164,15 @@ export function QuickSearchPalette({
     onBackToNotesList,
     needsUserDecision = false,
     onResumeSearch,
-    resumeToken
+    resumeToken: _resumeToken
 }: QuickSearchPaletteProps) {
     const inputRef = useRef<HTMLInputElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const [hoveredHit, setHoveredHit] = useState<SearchHit | null>(null);
     const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
     const [elapsedTime, setElapsedTime] = useState(0);
+    // Track IME composition state to prevent accidental sends during Chinese/Japanese input
+    const isComposingRef = useRef(false);
 
     // Timer logic
     useEffect(() => {
@@ -447,7 +449,8 @@ export function QuickSearchPalette({
                                         value={query}
                                         onChange={(event) => onChange(event.target.value)}
                                         onKeyDown={(event) => {
-                                            if (event.key === 'Enter') {
+                                            // Only submit on Enter if not composing (IME)
+                                            if (event.key === 'Enter' && !isComposingRef.current) {
                                                 event.preventDefault();
                                                 onSubmit(query.trim());
                                             }
@@ -456,6 +459,8 @@ export function QuickSearchPalette({
                                                 onClose();
                                             }
                                         }}
+                                        onCompositionStart={() => { isComposingRef.current = true; }}
+                                        onCompositionEnd={() => { isComposingRef.current = false; }}
                                         placeholder={placeholder}
                                         className="flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground"
                                     />

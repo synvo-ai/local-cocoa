@@ -6,6 +6,7 @@ export class WindowManager {
     public mainWindow: BrowserWindow | null = null;
     public spotlightWindow: BrowserWindow | null = null;
     public quickNoteWindow: BrowserWindow | null = null;
+    public mcpActivityWindow: BrowserWindow | null = null;
     private isQuitting = false;
     private spotlightShortcutRetryTimer: NodeJS.Timeout | null = null;
     private readonly SPOTLIGHT_SHORTCUT = process.platform === 'darwin'
@@ -39,7 +40,7 @@ export class WindowManager {
             width: config.windows.main.width,
             height: config.windows.main.height,
             backgroundColor: config.windows.main.backgroundColor,
-            icon: path.join(config.projectRoot, 'assets', 'icon.png'),
+            icon: path.join(config.paths.projectRoot, 'assets', 'icon.png'),
             ...(process.platform === 'darwin' ? {
                 titleBarStyle: 'hiddenInset',
                 trafficLightPosition: { x: 16, y: 16 },
@@ -85,7 +86,7 @@ export class WindowManager {
                 } else {
                     console.warn(`Blocked openExternal for unsafe protocol: ${parsed.protocol}`);
                 }
-            } catch (e) {
+            } catch {
                 console.error('Invalid URL for openExternal:', url);
             }
             return { action: 'deny' };
@@ -103,7 +104,7 @@ export class WindowManager {
             await this.mainWindow.loadFile(path.join(config.paths.dist, 'index.html'));
         }
 
-        if (!app.isPackaged) {
+        if (config.debugMode) {
             this.mainWindow.webContents.openDevTools({ mode: 'detach' });
         }
     }
@@ -351,6 +352,53 @@ export class WindowManager {
             this.mainWindow.show();
         }
         this.mainWindow.focus();
+    }
+
+    public async ensureMCPActivityWindow(): Promise<BrowserWindow> {
+        if (this.mcpActivityWindow && !this.mcpActivityWindow.isDestroyed()) {
+            return this.mcpActivityWindow;
+        }
+
+        const { width, height } = { width: 400, height: 200 };
+        // Position bottom-right
+        const primaryDisplay = require('electron').screen.getPrimaryDisplay();
+        const { workArea } = primaryDisplay;
+        const x = workArea.x + workArea.width - width - 20;
+        const y = workArea.y + workArea.height - height - 20;
+
+        this.mcpActivityWindow = new BrowserWindow({
+            width,
+            height,
+            x,
+            y,
+            frame: false,
+            transparent: true,
+            resizable: false,
+            show: false,
+            alwaysOnTop: true,
+            skipTaskbar: true,
+            visualEffectState: 'active',
+            vibrancy: 'hud',
+            webPreferences: {
+                preload: config.paths.preload,
+                nodeIntegration: false,
+                contextIsolation: true,
+                webSecurity: true
+            }
+        });
+
+        // Hide on blur? Maybe optional for this one as it updates live
+        // this.mcpActivityWindow.on('blur', () => this.mcpActivityWindow?.hide());
+
+        if (config.isDev && config.devServerUrl) {
+            await this.mcpActivityWindow.loadURL(`${config.devServerUrl}/#mcp-activity`);
+        } else {
+            // Fallback for packaged app or if devServerUrl is missing (though it shouldn't be in dev)
+            const filePath = path.join(__dirname, '../renderer/index.html');
+            await this.mcpActivityWindow.loadFile(filePath, { hash: 'mcp-activity' });
+        }
+
+        return this.mcpActivityWindow;
     }
 
     public broadcast(channel: string, ...args: any[]) {

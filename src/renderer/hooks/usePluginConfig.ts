@@ -217,8 +217,11 @@ export function usePluginConfig(): UsePluginConfigReturn {
  * Used by ExtensionsView to render the correct component
  */
 export const PLUGIN_COMPONENT_MAP: Record<string, string> = {
+    'activity': 'ActivityTimeline',
     'mail': 'EmailConnectorsPanel',
     'notes': 'NotesWorkspace',
+    'earlog': 'EarlogPanel',
+    'mbti': 'MbtiAnalysis',
     'mcp': 'MCPConnectionPanel',
 };
 

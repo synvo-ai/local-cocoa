@@ -18,7 +18,8 @@ export function registerChatHandlers() {
         return askWorkspace(payload.query, payload.limit, payload.mode, payload.searchMode);
     });
 
-    ipcMain.on('qa:ask-stream', (event, payload: { query: string; limit?: number; mode?: 'qa' | 'chat'; searchMode?: 'auto' | 'knowledge' | 'direct'; resumeToken?: string }) => {
+    ipcMain.on('qa:ask-stream', (event, payload: { query: string; limit?: number; mode?: 'qa' | 'chat'; searchMode?: 'auto' | 'knowledge' | 'direct'; resumeToken?: string; useVisionForAnswer?: boolean }) => {
+        console.log('[IPC chat.ts] qa:ask-stream received useVisionForAnswer:', payload.useVisionForAnswer);
         if (!payload?.query) {
             event.sender.send('qa:stream-error', 'Missing question text.');
             return;
@@ -44,7 +45,8 @@ export function registerChatHandlers() {
                 }
             },
             payload.searchMode,
-            payload.resumeToken
+            payload.resumeToken,
+            payload.useVisionForAnswer
         ).catch((err) => {
             if (!event.sender.isDestroyed()) {
                 event.sender.send('qa:stream-error', String(err));

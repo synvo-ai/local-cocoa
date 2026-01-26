@@ -137,7 +137,7 @@ export function useWorkspaceData() {
 
             const notesFolderIds = new Set(
                 folderRecords
-                    .filter((folder) => folder.path.toLowerCase().includes('/.local_rag/notes'))
+                    .filter((folder) => folder.path.toLowerCase().includes('/.synvo_db/notes'))
                     .map((folder) => folder.id)
             );
 
@@ -168,26 +168,70 @@ export function useWorkspaceData() {
 
     const refreshData = useCallback(async () => {
         const api = window.api;
-        if (!api) return;
+        if (!api) {
+            console.warn('[useWorkspaceData] No window.api available!');
+            return;
+        }
 
         try {
             // First check if backend is reachable via health check
+            console.log('[useWorkspaceData] Calling health check...');
             const healthData = await api.health();
-            
-            // If health status is degraded (backend unreachable), handle gracefully
-            if (healthData.status === 'degraded') {
-                setHealth(healthData);
-                // During startup, silently wait for backend - don't spam errors
+            console.log('[useWorkspaceData] Health check result:', healthData);
+
+            // Handle null health response (backend not responding at all)
+            if (!healthData) {
+                console.warn('[useWorkspaceData] Health check returned null');
                 if (backendStarting && startupRetryCountRef.current < maxStartupRetries) {
                     startupRetryCountRef.current += 1;
+                    console.log('[useWorkspaceData] Startup retry (null health):', startupRetryCountRef.current, '/', maxStartupRetries);
+                    setHealth({
+                        status: 'degraded',
+                        indexedFiles: 0,
+                        watchedFolders: 0,
+                        message: 'Backend starting...'
+                    });
                     return null;
                 }
-                // After startup period, log but don't spam
-                if (startupRetryCountRef.current === maxStartupRetries) {
-                    console.warn('Backend appears to be offline. Will continue checking...');
-                    startupRetryCountRef.current += 1; // Prevent repeated warnings
-                }
                 return null;
+            }
+
+            // If health status is degraded, check if backend is actually reachable
+            // Some optional services (like Whisper) being offline shouldn't block file management
+            if (healthData.status === 'degraded') {
+                console.warn('[useWorkspaceData] Health status is degraded:', healthData);
+                setHealth(healthData);
+                
+                // Check if this is a "soft" degradation (backend reachable, but some services offline)
+                // vs "hard" degradation (backend completely unreachable)
+                const isBackendReachable = healthData.message !== 'Backend unreachable' && 
+                                           (healthData.indexedFiles > 0 || healthData.watchedFolders > 0 ||
+                                            (healthData.services && healthData.services.some(s => s.status === 'online')));
+                
+                if (isBackendReachable) {
+                    // Backend is reachable but some services are offline - continue loading data
+                    console.log('[useWorkspaceData] Backend reachable despite degraded status, continuing...');
+                    // Reset startup state since backend is actually responding
+                    if (backendStarting) {
+                        setBackendStarting(false);
+                        startupRetryCountRef.current = 0;
+                    }
+                    // Don't return - continue to fetch data below
+                } else {
+                    // Backend is actually unreachable
+                    // During startup, silently wait for backend - don't spam errors
+                    if (backendStarting && startupRetryCountRef.current < maxStartupRetries) {
+                        startupRetryCountRef.current += 1;
+                        console.log('[useWorkspaceData] Startup retry:', startupRetryCountRef.current, '/', maxStartupRetries);
+                        return null;
+                    }
+                    // After startup period, log but don't spam
+                    if (startupRetryCountRef.current === maxStartupRetries) {
+                        console.warn('Backend appears to be offline. Will continue checking...');
+                        startupRetryCountRef.current += 1; // Prevent repeated warnings
+                    }
+                    return null;
+                }
             }
 
             // Backend is ready - reset startup state
@@ -203,9 +247,10 @@ export function useWorkspaceData() {
             const isCurrentlyIndexing = healthData.status === 'indexing';
             const shouldSkipInventory = isCurrentlyIndexing && (refreshCountRef.current % 3 !== 0);
             
+            console.log('[useWorkspaceData] Fetching data...');
             const [summaryData, folderData, inventoryData, emailData, specsData, stageProgressData] = await Promise.all([
                 api.indexSummary(),
-                api.listFolders(),
+                api.listFolders().then(f => { console.log('[useWorkspaceData] listFolders returned:', f.length, 'folders'); return f; }),
                 shouldSkipInventory
                     ? Promise.resolve({ files: files, progress, indexing: [] }) // Return cached data
                     : api.indexInventory({ limit: INVENTORY_LIMIT }),
@@ -214,15 +259,16 @@ export function useWorkspaceData() {
                 (api as any).stageProgress ? (api as any).stageProgress() : Promise.resolve(null)
             ]);
 
+            console.log('[useWorkspaceData] Setting state - folders:', folderData.length, 'files:', inventoryData.files?.length);
             setHealth(healthData);
             setSystemSpecs(specsData);
             setSummary(summaryData);
             setProgress(inventoryData.progress);
             setStageProgress(stageProgressData);
-            setIsIndexing(inventoryData.progress.status === 'running' || inventoryData.progress.status === 'paused');
+            setIsIndexing(inventoryData.progress?.status === 'running' || inventoryData.progress?.status === 'paused');
             setFolders(folderData);
 
-            const foundNotesFolder = folderData.find((folder: FolderRecord) => normalisePath(folder.path).includes('/.local_rag/notes'));
+            const foundNotesFolder = folderData.find((folder: FolderRecord) => normalisePath(folder.path).includes('/.synvo_db/notes'));
             setNoteFolderId(foundNotesFolder ? foundNotesFolder.id : null);
 
             const folderMap = new Map<string, FolderRecord>(folderData.map((folder: FolderRecord) => [folder.id, folder]));
@@ -248,9 +294,12 @@ export function useWorkspaceData() {
                 emailAccounts: resolvedEmailAccounts
             };
         } catch (error) {
+            console.error('[useWorkspaceData] Error in refreshData:', error);
+            console.error('[useWorkspaceData] Error stack:', error instanceof Error ? error.stack : 'N/A');
             // During startup, silently handle errors to avoid log spam
             if (backendStarting && startupRetryCountRef.current < maxStartupRetries) {
                 startupRetryCountRef.current += 1;
+                console.log('[useWorkspaceData] Startup error retry:', startupRetryCountRef.current);
                 // Set degraded health status
                 setHealth({
                     status: 'degraded',
@@ -264,6 +313,7 @@ export function useWorkspaceData() {
             console.error('Failed to refresh workspace data', error);
             return null;
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- files and progress are intentionally excluded to avoid infinite loops
     }, [partitionIndexingItems, backendStarting]);
 
     const stopPolling = useCallback(() => {

@@ -12,7 +12,6 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, CSSProperties } from 'react';
 import {
-    Zap,
     FileText,
     Image,
     Video,
@@ -53,7 +52,6 @@ import type {
     FileKind,
     ScannedFile,
     ScanProgress,
-    ScanDirectory,
     ScanScope,
     FolderNode,
     FileOrigin,
@@ -66,7 +64,7 @@ import type {
 
 type IndexStatus = 'not_indexed' | 'fast' | 'deep' | 'pending' | 'error';
 
-interface ScannedFileWithStatus extends ScannedFile {
+interface _ScannedFileWithStatus extends ScannedFile {
     indexStatus?: IndexStatus;
     indexedFileId?: string;
 }
@@ -654,13 +652,13 @@ export function ScanWorkspace({ className }: ScanWorkspaceProps) {
         } catch (e) { /* ignore */ }
         return [];
     });
-    const [folderTree, setFolderTree] = useState<FolderNode[]>([]);
+    const [_folderTree, setFolderTree] = useState<FolderNode[]>([]);
     const [scanStartTime, setScanStartTime] = useState<number | null>(null);
     const [cancelFn, setCancelFn] = useState<(() => void) | null>(null);
 
     // Path ticker for progress display
     const [currentPathDisplay, setCurrentPathDisplay] = useState<string>('');
-    const pathTickerRef = useRef<NodeJS.Timeout | null>(null);
+    const _pathTickerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Buffer for files during scanning - reduces React re-renders
     const filesBufferRef = useRef<ScannedFile[]>([]);
@@ -1834,7 +1832,7 @@ export function ScanWorkspace({ className }: ScanWorkspaceProps) {
                                                 {/* Index Status Badge */}
                                                 <IndexStatusBadge status={status} />
 
-                                                {/* Upgrade to Deep button for Fast indexed files */}
+                                                {/* Deep Index button for Fast indexed files */}
                                                 {status === 'fast' && !isIndexing && (
                                                     <button
                                                         onClick={(e) => {
@@ -1842,7 +1840,7 @@ export function ScanWorkspace({ className }: ScanWorkspaceProps) {
                                                             handleIndexFile(file.path, 'deep');
                                                         }}
                                                         className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/50 transition-colors"
-                                                        title="Upgrade to Deep index"
+                                                        title="Deep Index index"
                                                     >
                                                         <ArrowUp className="h-3 w-3" />
                                                         Deep

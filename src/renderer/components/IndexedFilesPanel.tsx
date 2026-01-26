@@ -11,7 +11,6 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
     Folder,
     FolderOpen,
-    Plus,
     FileText,
     Trash2,
     ChevronDown,
@@ -35,9 +34,13 @@ import {
     Shield,
     ShieldOff,
     Lock,
+    Brain,
+    Play,
+    Pause,
+    RefreshCw,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import type { FolderRecord, IndexedFile, IndexingItem, PrivacyLevel } from '../types';
+import type { FolderRecord, IndexedFile, IndexingItem, PrivacyLevel, MemoryStatus } from '../types';
 
 // ============================================
 // Helper Functions
@@ -55,7 +58,7 @@ function formatBytes(size: number): string {
     return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unit]}`;
 }
 
-function formatRelativeTime(dateStr: string): string {
+function _formatRelativeTime(dateStr: string): string {
     const date = new Date(dateStr);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -220,20 +223,54 @@ function buildFolderTree(folders: FolderRecord[], filesByFolder: Map<string, Ind
 // Index Mode Types
 // ============================================
 
-type IndexMode = 'fast' | 'deep' | 'none' | 'error' | 'processing';
+// More granular mode: processing and done states per stage
+type IndexMode = 
+    | 'keyword_processing' | 'keyword_done'
+    | 'semantic_processing' | 'semantic_done'
+    | 'vision_processing' | 'vision_done'
+    | 'none' | 'error';
 
-function getFileIndexMode(file: IndexedFile, processingFiles: Set<string>): IndexMode {
-    if (processingFiles.has(file.fullPath)) return 'processing';
+// Determine which stage a processing file is in based on its stage string
+function getProcessingStage(stage?: string | null): 'keyword' | 'semantic' | 'vision' | null {
+    if (!stage) return null;
+    const s = stage.toLowerCase();
+    // Vision/Deep stage
+    if (s.includes('deep') || s.includes('vision')) return 'vision';
+    // Semantic/Embed stage
+    if (s.includes('embed') || s.includes('semantic')) return 'semantic';
+    // Keyword/Text stage (scan, enrich, fast_text, store, pdf_text, etc.)
+    if (s.includes('text') || s.includes('scan') || s.includes('enrich') || s.includes('store') || s.includes('pdf')) return 'keyword';
+    return 'keyword'; // Default to keyword for unknown stages
+}
 
-    // Prioritize new stage fields (fastStage, deepStage)
-    // Deep stage > 0 means Deep index completed (except error/skipped)
-    if (file.deepStage && file.deepStage > 0) return 'deep';
+interface ProcessingInfo {
+    isProcessing: boolean;
+    stage?: string | null;
+}
 
-    // Fast stage > 0 means Fast index completed (except error)
-    if (file.fastStage && file.fastStage > 0) return 'fast';
+function getFileIndexMode(file: IndexedFile, processingInfo: ProcessingInfo): IndexMode {
+    // If processing, determine which stage
+    if (processingInfo.isProcessing) {
+        const stage = getProcessingStage(processingInfo.stage);
+        if (stage === 'vision') return 'vision_processing';
+        if (stage === 'semantic') return 'semantic_processing';
+        return 'keyword_processing';
+    }
+
+    // Error state
+    if (file.indexStatus === 'error') return 'error';
+
+    // Check completion states based on stage fields
+    // Deep stage > 0 means Vision index completed
+    if (file.deepStage && file.deepStage > 0) return 'vision_done';
+
+    // Fast stage = 2 means Semantic (embedding) completed
+    if (file.fastStage && file.fastStage >= 2) return 'semantic_done';
+
+    // Fast stage = 1 means only Keyword (text extraction) completed
+    if (file.fastStage && file.fastStage === 1) return 'keyword_done';
 
     // Legacy fallback (metadata checks)
-    if (file.indexStatus === 'error') return 'error';
     if (file.indexStatus === 'pending') return 'none';
 
     const metadata = file.metadata as Record<string, unknown> | undefined;
@@ -241,61 +278,273 @@ function getFileIndexMode(file: IndexedFile, processingFiles: Set<string>): Inde
 
     const chunkStrategy = metadata.chunk_strategy as string | undefined;
     if (chunkStrategy) {
-        if (chunkStrategy.includes('_fine')) return 'deep';
-        if (chunkStrategy.includes('_fast')) return 'fast';
+        if (chunkStrategy.includes('_fine')) return 'vision_done';
+        if (chunkStrategy.includes('_fast')) return 'semantic_done';
     }
 
     const pdfVisionMode = metadata.pdf_vision_mode as string | undefined;
-    if (pdfVisionMode === 'deep') return 'deep';
-    if (pdfVisionMode === 'fast') return 'fast';
+    if (pdfVisionMode === 'deep') return 'vision_done';
+    if (pdfVisionMode === 'fast') return 'semantic_done';
 
-    if (chunkStrategy) return 'fast';
+    if (chunkStrategy) return 'semantic_done';
 
     return 'none';
 }
 
 // Status badge component with modern styling
 function StatusBadge({ mode }: { mode: IndexMode }) {
-    const config = {
+    const config: Record<IndexMode, { icon: typeof AlertCircle; label: string; className: string; animate?: boolean }> = {
         error: {
             icon: AlertCircle,
             label: 'Error',
             className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
         },
-        processing: {
+        // Keyword stage (green)
+        keyword_processing: {
+            icon: Loader2,
+            label: 'Indexing',
+            className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+            animate: true,
+        },
+        keyword_done: {
+            icon: Zap,
+            label: 'Indexed',
+            className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+        },
+        // Semantic stage (blue)
+        semantic_processing: {
             icon: Loader2,
             label: 'Indexing',
             className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
             animate: true,
         },
-        deep: {
-            icon: Eye,
-            label: 'Indexed (Deep)',
-            className: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20',
-        },
-        fast: {
+        semantic_done: {
             icon: Zap,
             label: 'Indexed',
-            className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+            className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
         },
+        // Vision stage (purple)
+        vision_processing: {
+            icon: Loader2,
+            label: 'Indexing',
+            className: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20',
+            animate: true,
+        },
+        vision_done: {
+            icon: Eye,
+            label: 'Indexed',
+            className: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20',
+        },
+        // Pending (gray)
         none: {
             icon: Clock,
             label: 'Pending',
             className: 'bg-muted text-muted-foreground border-muted-foreground/20',
         },
-    }[mode];
+    };
 
-    const Icon = config.icon;
+    const { icon: Icon, label, className, animate } = config[mode];
 
     return (
         <span className={cn(
             "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-medium",
-            config.className
+            className
         )}>
-            <Icon className={cn("h-3 w-3", config.animate && "animate-spin")} />
-            <span>{config.label}</span>
+            <Icon className={cn("h-3 w-3", animate && "animate-spin")} />
+            <span>{label}</span>
         </span>
     );
+}
+
+// Memory status badge component with progress bar
+function MemoryStatusBadge({ 
+    status, 
+    totalChunks = 0, 
+    processedChunks = 0,
+    onStart,
+    onPause,
+}: { 
+    status?: MemoryStatus;
+    totalChunks?: number;
+    processedChunks?: number;
+    onStart?: () => void;
+    onPause?: () => void;
+}) {
+    // Show nothing if status is undefined
+    if (!status) return null;
+
+    // Calculate progress percentage
+    const progress = totalChunks > 0 ? Math.round((processedChunks / totalChunks) * 100) : 0;
+
+    // Extracted: show completed progress bar with count and re-extract button
+    if (status === 'extracted') {
+        return (
+            <div className="flex flex-col gap-0.5 w-full">
+                <div className="flex items-center justify-between text-[9px]">
+                    <span className="text-purple-600 dark:text-purple-400 font-medium flex items-center gap-1">
+                        <Brain className="h-2.5 w-2.5" />
+                        {totalChunks > 0 ? `${totalChunks} memories` : 'Done'}
+                    </span>
+                    {onStart && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); onStart(); }}
+                            className="p-0.5 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-600 dark:text-purple-400"
+                            title="Re-extract memory"
+                        >
+                            <RefreshCw className="h-2.5 w-2.5" />
+                        </button>
+                    )}
+                </div>
+                <div className="w-full h-1.5 bg-purple-500/10 rounded-full overflow-hidden">
+                    <div className="h-full bg-purple-500 w-full" />
+                </div>
+            </div>
+        );
+    }
+
+    // Extracting: show progress bar with "Building memory" text and pause button
+    if (status === 'extracting') {
+        return (
+            <div className="flex flex-col gap-0.5 w-full">
+                <div className="flex items-center justify-between text-[9px]">
+                    <span className="text-purple-600 dark:text-purple-400 font-medium flex items-center gap-1">
+                        <Brain className="h-2.5 w-2.5 animate-pulse" />
+                        Building
+                    </span>
+                    <div className="flex items-center gap-1">
+                        <span className="text-muted-foreground">{processedChunks}/{totalChunks}</span>
+                        {onPause && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onPause(); }}
+                                className="p-0.5 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-600 dark:text-purple-400"
+                                title="Pause extraction"
+                            >
+                                <Pause className="h-2.5 w-2.5" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+                <div className="w-full h-1.5 bg-purple-500/10 rounded-full overflow-hidden">
+                    <div 
+                        className="h-full bg-purple-500 transition-all duration-300 ease-out"
+                        style={{ width: `${progress}%` }}
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    // Pending: show "Paused" if has partial progress, otherwise "Not started"
+    if (status === 'pending') {
+        const isPaused = processedChunks > 0 && totalChunks > 0;
+        
+        if (isPaused) {
+            // Paused state with progress preserved
+            return (
+                <div className="flex flex-col gap-0.5 w-full">
+                    <div className="flex items-center justify-between text-[9px]">
+                        <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                            <Brain className="h-2.5 w-2.5" />
+                            Paused
+                        </span>
+                        <div className="flex items-center gap-1">
+                            <span className="text-muted-foreground">{processedChunks}/{totalChunks}</span>
+                            {onStart && (
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); onStart(); }}
+                                    className="p-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 dark:text-amber-400"
+                                    title="Resume extraction"
+                                >
+                                    <Play className="h-2.5 w-2.5" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    <div className="w-full h-1.5 bg-amber-500/10 rounded-full overflow-hidden">
+                        <div 
+                            className="h-full bg-amber-500/70"
+                            style={{ width: `${progress}%` }}
+                        />
+                    </div>
+                </div>
+            );
+        }
+        
+        // Not started state (no progress yet)
+        return (
+            <div className="flex flex-col gap-0.5 w-full">
+                <div className="flex items-center justify-between text-[9px]">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                        <Brain className="h-2.5 w-2.5 opacity-50" />
+                        Not started
+                    </span>
+                    {onStart && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); onStart(); }}
+                            className="p-0.5 rounded bg-gray-500/20 hover:bg-gray-500/30 text-muted-foreground"
+                            title="Start memory extraction"
+                        >
+                            <Play className="h-2.5 w-2.5" />
+                        </button>
+                    )}
+                </div>
+                <div className="w-full h-1.5 bg-gray-500/10 rounded-full overflow-hidden">
+                    <div className="h-full bg-gray-400/30 w-0" />
+                </div>
+            </div>
+        );
+    }
+
+    // Error: show error state with red bar and retry button
+    if (status === 'error') {
+        const hasPartialProgress = processedChunks > 0 && totalChunks > 0;
+        return (
+            <div className="flex flex-col gap-0.5 w-full">
+                <div className="flex items-center justify-between text-[9px]">
+                    <span className="text-red-500 dark:text-red-400 font-medium flex items-center gap-1">
+                        <Brain className="h-2.5 w-2.5" />
+                        Error
+                    </span>
+                    <div className="flex items-center gap-1">
+                        {hasPartialProgress && (
+                            <span className="text-muted-foreground">{processedChunks}/{totalChunks}</span>
+                        )}
+                        {onStart && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onStart(); }}
+                                className="p-0.5 rounded bg-red-500/20 hover:bg-red-500/30 text-red-500 dark:text-red-400"
+                                title={hasPartialProgress ? "Retry from last checkpoint" : "Retry extraction"}
+                            >
+                                <RefreshCw className="h-2.5 w-2.5" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+                <div className="w-full h-1.5 bg-red-500/10 rounded-full overflow-hidden">
+                    <div className="h-full bg-red-500/50" style={{ width: `${progress}%` }} />
+                </div>
+            </div>
+        );
+    }
+
+    // Skipped: show gray bar
+    if (status === 'skipped') {
+        return (
+            <div className="flex flex-col gap-0.5 w-full">
+                <div className="flex items-center justify-between text-[9px]">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                        <Brain className="h-2.5 w-2.5 opacity-50" />
+                        Skipped
+                    </span>
+                </div>
+                <div className="w-full h-1.5 bg-gray-500/10 rounded-full overflow-hidden">
+                    <div className="h-full bg-gray-400/50 w-full" />
+                </div>
+            </div>
+        );
+    }
+
+    return null;
 }
 
 // ============================================
@@ -597,15 +846,20 @@ interface FileRowProps {
     onSelect: () => void;
     onOpen: () => void;
     onIndex: (mode: 'fast' | 'deep') => void;
+    onUnindex?: () => void;
     onTogglePrivacy?: (fileId: string, currentLevel: PrivacyLevel) => void;
+    onExtractMemory?: (fileId: string, force?: boolean) => void;
+    onPauseMemory?: (fileId: string) => void;
 }
 
-function FileRow({ file, mode, onSelect, onOpen, onIndex, onTogglePrivacy }: FileRowProps) {
+function FileRow({ file, mode, onSelect, onOpen, onIndex, onUnindex, onTogglePrivacy, onExtractMemory, onPauseMemory }: FileRowProps) {
     const typeConfig = getFileTypeConfig(file.kind || 'other');
     const Icon = typeConfig.icon;
     const isProcessing = mode === 'processing';
     const isFast = mode === 'fast';
     const isPrivate = file.privacyLevel === 'private';
+    const hasMemory = file.memoryStatus === 'extracted';
+    const canStartMemory = mode !== 'pending' && mode !== 'processing';  // File is indexed
 
     return (
         <div
@@ -619,13 +873,13 @@ function FileRow({ file, mode, onSelect, onOpen, onIndex, onTogglePrivacy }: Fil
             )}
         >
             {/* File icon - simple style */}
-            <div className="shrink-0">
+            <div className="w-5 shrink-0">
                 <Icon className={cn("h-5 w-5", typeConfig.color)} />
             </div>
 
-            {/* File name - takes most space */}
-            <div className="flex-1 min-w-0 flex items-center gap-2">
-                <p className="text-sm truncate">{file.name}</p>
+            {/* File name - takes most space, minimum 200px */}
+            <div className="flex-1 min-w-[200px] flex items-center gap-2">
+                <p className="text-sm truncate" title={file.name}>{file.name}</p>
                 {isPrivate && (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-medium shrink-0">
                         <Lock className="h-2.5 w-2.5" />
@@ -634,13 +888,24 @@ function FileRow({ file, mode, onSelect, onOpen, onIndex, onTogglePrivacy }: Fil
                 )}
             </div>
 
-            {/* Status badge */}
-            <div className="w-32 shrink-0">
+            {/* Index Status - compact */}
+            <div className="w-20 shrink-0">
                 <StatusBadge mode={mode} />
             </div>
 
-            {/* Size */}
-            <span className="text-sm text-muted-foreground w-24 text-right shrink-0">
+            {/* Memory Status - compact */}
+            <div className="w-24 shrink-0">
+                <MemoryStatusBadge 
+                    status={file.memoryStatus} 
+                    totalChunks={file.memoryTotalChunks}
+                    processedChunks={file.memoryProcessedChunks}
+                    onStart={canStartMemory && onExtractMemory ? () => onExtractMemory(file.id, hasMemory) : undefined}
+                    onPause={onPauseMemory ? () => onPauseMemory(file.id) : undefined}
+                />
+            </div>
+
+            {/* Size - compact */}
+            <span className="text-sm text-muted-foreground w-16 text-right shrink-0">
                 {formatBytes(file.size)}
             </span>
 
@@ -656,9 +921,9 @@ function FileRow({ file, mode, onSelect, onOpen, onIndex, onTogglePrivacy }: Fil
                         { label: 'Open File', value: 'open', icon: ExternalLink },
                         ...(isProcessing ? [] : [
                             { label: 'Fast Index', value: 'fast', icon: Zap },
-                            // Show "Upgrade to Deep" for fast-indexed files, "Deep Index" otherwise
+                            // Show "Deep Index" for fast-indexed files, "Deep Index" otherwise
                             ...(isFast
-                                ? [{ label: 'Upgrade to Deep', value: 'deep', icon: ArrowUp }]
+                                ? [{ label: 'Deep Index', value: 'deep', icon: ArrowUp }]
                                 : [{ label: 'Deep Index', value: 'deep', icon: Eye }]
                             ),
                         ]),
@@ -667,6 +932,9 @@ function FileRow({ file, mode, onSelect, onOpen, onIndex, onTogglePrivacy }: Fil
                             value: 'toggle-privacy', 
                             icon: isPrivate ? ShieldOff : Shield 
                         },
+                        ...(onUnindex && mode !== 'none' && mode !== 'processing' ? [
+                            { label: 'Unindex', value: 'unindex', icon: Trash2 },
+                        ] : []),
                     ]}
                     onSelect={(value) => {
                         if (value === 'open') onOpen();
@@ -675,6 +943,7 @@ function FileRow({ file, mode, onSelect, onOpen, onIndex, onTogglePrivacy }: Fil
                         else if (value === 'toggle-privacy') {
                             onTogglePrivacy?.(file.id, file.privacyLevel || 'normal');
                         }
+                        else if (value === 'unindex') onUnindex?.();
                     }}
                 />
             </div>
@@ -767,13 +1036,14 @@ export function IndexedFilesPanel({
     folders,
     files,
     indexingItems = [],
-    isIndexing,
+    isIndexing: _isIndexing,
     onAddFolder,
     onAddFile,
     onRemoveFolder,
     onReindexFolder,
     onSelectFile,
     onOpenFile,
+    onDeleteFile,
     onRefresh,
     className,
 }: IndexedFilesPanelProps) {
@@ -783,23 +1053,35 @@ export function IndexedFilesPanel({
     const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
     const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(['root']));
     const [filterType, setFilterType] = useState<FilterType>('all');
-    const [processingFiles, setProcessingFiles] = useState<Set<string>>(new Set());
+    // Map file path to its processing stage
+    const [processingFilesMap, setProcessingFilesMap] = useState<Map<string, string | null | undefined>>(new Map());
 
-    // Track processing files
+    // Track processing files with their stages
     useEffect(() => {
-        const processingPaths: string[] = [];
+        const newMap = new Map<string, string | null | undefined>();
         for (const item of indexingItems) {
             if (item.status === 'processing' || item.status === 'pending') {
-                processingPaths.push(item.filePath);
+                newMap.set(item.filePath, item.stage);
             }
         }
-        setProcessingFiles(prev => {
-            const prevPaths = Array.from(prev).sort().join(',');
-            const newPaths = processingPaths.sort().join(',');
-            if (prevPaths === newPaths) return prev;
-            return new Set(processingPaths);
+        setProcessingFilesMap(prev => {
+            // Simple comparison by size and content
+            if (prev.size !== newMap.size) return newMap;
+            for (const [key, value] of newMap) {
+                if (prev.get(key) !== value) return newMap;
+            }
+            return prev;
         });
     }, [indexingItems]);
+
+    // Helper to get processing info for a file
+    const getProcessingInfo = useCallback((file: IndexedFile): ProcessingInfo => {
+        const stage = processingFilesMap.get(file.fullPath);
+        return {
+            isProcessing: processingFilesMap.has(file.fullPath),
+            stage,
+        };
+    }, [processingFilesMap]);
 
     // Group files by folder
     const filesByFolder = useMemo(() => {
@@ -939,6 +1221,20 @@ export function IndexedFilesPanel({
             }
         }
     }, [onOpenFile]);
+
+    // Unindex (delete) a file from the index
+    const handleUnindexFile = useCallback(async (fileId: string) => {
+        if (onDeleteFile) {
+            await onDeleteFile(fileId);
+            onRefresh?.();
+        } else {
+            const api = window.api;
+            if (api?.deleteFile) {
+                await api.deleteFile(fileId);
+                onRefresh?.();
+            }
+        }
+    }, [onDeleteFile, onRefresh]);
     
     // Privacy toggle for files
     const handleToggleFilePrivacy = useCallback(async (fileId: string, currentLevel: PrivacyLevel) => {
@@ -968,6 +1264,76 @@ export function IndexedFilesPanel({
         } catch (error) {
             console.error('Failed to toggle folder privacy:', error);
         }
+    }, [onRefresh]);
+    
+    // Handle memory extraction for a file
+    // force: If true, re-extract all chunks (no resume / 不支持断点续传)
+    // Note: Uses fire-and-forget pattern to allow parallel extractions
+    const handleExtractMemory = useCallback((fileId: string, force: boolean = false) => {
+        const api = window.api;
+        if (!api?.memoryExtractForFile) {
+            console.error('Memory extraction API not available');
+            return;
+        }
+        
+        // Fetch global memory_chunk_size setting, then extract
+        const startExtraction = (chunkSize?: number) => {
+            console.log(`🧠 ${force ? 'Re-extracting' : 'Extracting'} memory for file:`, fileId, chunkSize ? `(chunk_size=${chunkSize})` : '(auto)');
+            
+            // Fire-and-forget: don't await, so user can start multiple extractions in parallel
+            api.memoryExtractForFile(fileId, undefined, force, chunkSize || undefined)
+                .then((result) => {
+                    console.log('🧠 Memory extraction completed:', result);
+                    onRefresh?.();
+                })
+                .catch((error) => {
+                    console.error('Failed to extract memory:', error);
+                    onRefresh?.();
+                });
+            
+            // Immediate refresh to show "extracting" status
+            setTimeout(() => onRefresh?.(), 500);
+        };
+        
+        // Try to fetch settings to get memory_chunk_size
+        if (api.getSettings) {
+            api.getSettings()
+                .then((settings) => {
+                    const chunkSize = settings?.memory_chunk_size;
+                    startExtraction(chunkSize && chunkSize > 0 ? chunkSize : undefined);
+                })
+                .catch(() => {
+                    // Fallback: use auto (no custom chunk size)
+                    startExtraction(undefined);
+                });
+        } else {
+            startExtraction(undefined);
+        }
+    }, [onRefresh]);
+    
+    // Handle pause memory extraction for a file
+    const handlePauseMemory = useCallback((fileId: string) => {
+        const api = window.api;
+        if (!api?.memoryPauseForFile) {
+            console.warn('Memory pause API not available');
+            return;
+        }
+        
+        console.log(`⏸️ Pausing memory extraction for file:`, fileId);
+        
+        // Fire-and-forget for quick response
+        api.memoryPauseForFile(fileId)
+            .then((result) => {
+                console.log('⏸️ Pause result:', result);
+                onRefresh?.();
+            })
+            .catch((error) => {
+                console.error('Failed to pause memory extraction:', error);
+                onRefresh?.();
+            });
+        
+        // Immediate refresh to show "paused" status
+        setTimeout(() => onRefresh?.(), 300);
     }, [onRefresh]);
 
     // Initialize root as selected
@@ -1124,9 +1490,10 @@ export function IndexedFilesPanel({
                 {displayedFiles.length > 0 && (
                     <div className="flex items-center gap-4 px-4 py-2 border-b bg-muted/20 text-xs font-medium text-muted-foreground">
                         <div className="w-5 shrink-0" /> {/* Icon space */}
-                        <div className="flex-1">Name</div>
-                        <div className="w-32 shrink-0">Status</div>
-                        <div className="w-24 text-right shrink-0">Size</div>
+                        <div className="flex-1 min-w-[200px]">Name</div>
+                        <div className="w-20 shrink-0">Index</div>
+                        <div className="w-24 shrink-0">Memory</div>
+                        <div className="w-16 text-right shrink-0">Size</div>
                         <div className="w-8 shrink-0" /> {/* Actions space */}
                     </div>
                 )}
@@ -1149,11 +1516,14 @@ export function IndexedFilesPanel({
                                 <FileRow
                                     key={file.id}
                                     file={file}
-                                    mode={getFileIndexMode(file, processingFiles)}
+                                    mode={getFileIndexMode(file, getProcessingInfo(file))}
                                     onSelect={() => onSelectFile?.(file)}
                                     onOpen={() => handleOpenFile(file)}
                                     onIndex={(mode) => handleIndexFile(file.fullPath, mode)}
+                                    onUnindex={() => handleUnindexFile(file.id)}
                                     onTogglePrivacy={handleToggleFilePrivacy}
+                                    onExtractMemory={handleExtractMemory}
+                                    onPauseMemory={handlePauseMemory}
                                 />
                             ))}
                         </div>
@@ -1163,3 +1533,4 @@ export function IndexedFilesPanel({
         </div>
     );
 }
+

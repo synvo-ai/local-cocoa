@@ -4,6 +4,8 @@ node_modules/
 # Build artifacts
 dist/
 dist-electron/
+.tsbuild/
+*.tsbuildinfo
 
 # Logs and runtime data
 logs/
@@ -113,11 +115,6 @@ storage/
 release/
 
 # Reference and Test Scripts
-for_ref_llama_cpp_usage.py
-test_file_api.py
-test_models.py
-question.sh
-
 package-lock.json
 
 !services/storage/

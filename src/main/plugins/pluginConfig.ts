@@ -5,9 +5,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { app } from 'electron';
-import type { PluginsUserConfig, PluginUserConfig, PluginManifestInfo } from '../../types/plugins';
-import { createDefaultPluginsConfig, PLUGINS_CONFIG_VERSION } from '../../types/plugins';
+import type { PluginsUserConfig, PluginUserConfig } from '../../types/plugins';
+import { createDefaultPluginsConfig, PLUGINS_CONFIG_VERSION, SUPPORTED_PLUGINS } from '../../types/plugins';
+import { config } from '../config';
 
 const PLUGINS_CONFIG_FILE = 'plugins-config.json';
 
@@ -15,8 +15,8 @@ const PLUGINS_CONFIG_FILE = 'plugins-config.json';
  * Get the path to the plugins config file
  */
 function getConfigPath(): string {
-    const userDataPath = app.getPath('userData');
-    return path.join(userDataPath, PLUGINS_CONFIG_FILE);
+    // Store in synvo_db alongside other user data
+    return path.join(config.paths.runtimeRoot, PLUGINS_CONFIG_FILE);
 }
 
 /**
@@ -31,7 +31,18 @@ export function loadPluginsConfig(): PluginsUserConfig | null {
             
             // Migrate if needed
             if (!config.version || config.version < PLUGINS_CONFIG_VERSION) {
-                console.log('[PluginConfig] Migrating config to version', PLUGINS_CONFIG_VERSION);
+                console.log('[PluginConfig] Migrating config from version', config.version || 1, 'to version', PLUGINS_CONFIG_VERSION);
+                
+                // Migration from v1 to v2: Disable unsupported plugins
+                if (!config.version || config.version < 2) {
+                    for (const pluginId of Object.keys(config.plugins)) {
+                        if (!SUPPORTED_PLUGINS.includes(pluginId)) {
+                            config.plugins[pluginId].enabled = false;
+                            console.log(`[PluginConfig] Migration: Disabled unsupported plugin: ${pluginId}`);
+                        }
+                    }
+                }
+                
                 config.version = PLUGINS_CONFIG_VERSION;
                 savePluginsConfig(config);
             }
@@ -86,14 +97,16 @@ export function getPluginsConfig(discoveredPluginIds: string[]): PluginsUserConf
     for (const pluginId of discoveredPluginIds) {
         if (!config.plugins[pluginId]) {
             const order = config.order.length;
+            // Only enable supported plugins by default
+            const isSupported = SUPPORTED_PLUGINS.includes(pluginId);
             config.plugins[pluginId] = {
                 pluginId,
-                enabled: true,
+                enabled: isSupported,
                 order,
             };
             config.order.push(pluginId);
             needsSave = true;
-            console.log(`[PluginConfig] Added new plugin: ${pluginId}`);
+            console.log(`[PluginConfig] Added new plugin: ${pluginId} (enabled: ${isSupported})`);
         }
     }
     
