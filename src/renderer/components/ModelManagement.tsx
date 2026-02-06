@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, CSSProperties } from 'react';
+import { useEffect, useMemo, useState, CSSProperties, useCallback } from 'react';
 import { Download, Check, AlertCircle, HardDrive, Box, RotateCcw, Activity, Power, PlayCircle } from 'lucide-react';
 import { useModelStatus, type ModelRuntimeStatus } from '../hooks/useModelStatus';
 import { useModelConfig } from '../hooks/useModelConfig';
@@ -110,56 +110,54 @@ export function ModelManagement() {
     const [_summaryTokensIdx, setSummaryTokensIdx] = useState(1);
     const [_searchLimitIdx, setSearchLimitIdx] = useState(1);
     const [_snippetLengthIdx, setSnippetLengthIdx] = useState(1);
+    const [prevConfig, setPrevConfig] = useState(config);
 
     const [embedBatchSizeDraft, setEmbedBatchSizeDraft] = useState(10);
     const [embedBatchDelayDraft, setEmbedBatchDelayDraft] = useState(10);
     const [visionBatchDelayDraft, setVisionBatchDelayDraft] = useState(200);
 
-    useEffect(() => {
-        if (!config) return;
+    if (config !== prevConfig) {
+        setPrevConfig(config);
+        if (config) {
+            const currentContextSize = allowedContextSizes.includes(config.contextSize)
+                ? config.contextSize
+                : allowedContextSizes[0] ?? 4096;
+            const nextContextSizeIdx = Math.max(0, allowedContextSizes.indexOf(currentContextSize));
+            setContextSizeIdx(nextContextSizeIdx);
 
-        const currentContextSize = allowedContextSizes.includes(config.contextSize)
-            ? config.contextSize
-            : allowedContextSizes[0] ?? 4096;
-        setContextSizeIdx(Math.max(0, allowedContextSizes.indexOf(currentContextSize)));
+            const currentVision = typeof config.visionMaxPixels === 'number' ? config.visionMaxPixels : 1003520;
+            const nextVisionIdx = visionOptions.findIndex((opt) => opt.value === currentVision);
+            const targetVisionIdx = nextVisionIdx >= 0 ? nextVisionIdx : 2;
+            setVisionIdx(targetVisionIdx);
 
-        const currentVision = typeof config.visionMaxPixels === 'number' ? config.visionMaxPixels : 1003520;
-        const nextVisionIdx = visionOptions.findIndex((opt) => opt.value === currentVision);
-        setVisionIdx(nextVisionIdx >= 0 ? nextVisionIdx : 2);
+            const nextQa = typeof config.qaContextLimit === 'number' ? config.qaContextLimit : 5;
+            setQaContextLimitDraft(nextQa);
 
-        setQaContextLimitDraft(typeof config.qaContextLimit === 'number' ? config.qaContextLimit : 5);
+            const summaryValue = typeof config.summaryMaxTokens === 'number' ? config.summaryMaxTokens : 256;
+            const nextSummaryIdx = discreteSummaryTokens.indexOf(summaryValue);
+            const targetSummaryIdx = nextSummaryIdx >= 0 ? nextSummaryIdx : 1;
+            setSummaryTokensIdx(targetSummaryIdx);
 
-        const summaryValue = typeof config.summaryMaxTokens === 'number' ? config.summaryMaxTokens : 256;
-        const nextSummaryIdx = discreteSummaryTokens.indexOf(summaryValue);
-        setSummaryTokensIdx(nextSummaryIdx >= 0 ? nextSummaryIdx : 1);
+            const searchValue = typeof config.searchResultLimit === 'number' ? config.searchResultLimit : 15;
+            const nextSearchIdx = discreteSearchLimits.indexOf(searchValue);
+            const targetSearchIdx = nextSearchIdx >= 0 ? nextSearchIdx : 1;
+            setSearchLimitIdx(targetSearchIdx);
 
-        const searchValue = typeof config.searchResultLimit === 'number' ? config.searchResultLimit : 15;
-        const nextSearchIdx = discreteSearchLimits.indexOf(searchValue);
-        setSearchLimitIdx(nextSearchIdx >= 0 ? nextSearchIdx : 1);
+            const snippetValue = typeof config.maxSnippetLength === 'number' ? config.maxSnippetLength : 2000;
+            const nextSnippetIdx = discreteSnippetLengths.indexOf(snippetValue);
+            const targetSnippetIdx = nextSnippetIdx >= 0 ? nextSnippetIdx : 1;
+            setSnippetLengthIdx(targetSnippetIdx);
 
-        const snippetValue = typeof config.maxSnippetLength === 'number' ? config.maxSnippetLength : 2000;
-        const nextSnippetIdx = discreteSnippetLengths.indexOf(snippetValue);
-        setSnippetLengthIdx(nextSnippetIdx >= 0 ? nextSnippetIdx : 1);
+            const nextEmbedBatchSize = typeof config.embedBatchSize === 'number' ? config.embedBatchSize : 10;
+            setEmbedBatchSizeDraft(nextEmbedBatchSize);
 
-        setEmbedBatchSizeDraft(typeof config.embedBatchSize === 'number' ? config.embedBatchSize : 10);
-        setEmbedBatchDelayDraft(typeof config.embedBatchDelayMs === 'number' ? config.embedBatchDelayMs : 10);
-        setVisionBatchDelayDraft(typeof config.visionBatchDelayMs === 'number' ? config.visionBatchDelayMs : 200);
-    }, [
-        allowedContextSizes,
-        config?.contextSize,
-        config?.embedBatchDelayMs,
-        config?.embedBatchSize,
-        config?.maxSnippetLength,
-        config?.qaContextLimit,
-        config?.searchResultLimit,
-        config?.summaryMaxTokens,
-        config?.visionBatchDelayMs,
-        config?.visionMaxPixels,
-        discreteSearchLimits,
-        discreteSnippetLengths,
-        discreteSummaryTokens,
-        visionOptions
-    ]);
+            const nextEmbedBatchDelay = typeof config.embedBatchDelayMs === 'number' ? config.embedBatchDelayMs : 10;
+            setEmbedBatchDelayDraft(nextEmbedBatchDelay);
+
+            const nextVisionBatchDelay = typeof config.visionBatchDelayMs === 'number' ? config.visionBatchDelayMs : 200;
+            setVisionBatchDelayDraft(nextVisionBatchDelay);
+        }
+    }
 
     // Hide save success message when window loses focus (user switches tabs)
     useEffect(() => {
@@ -217,7 +215,7 @@ export function ModelManagement() {
     // Get active model label for each service type
     const getActiveModelLabel = useCallback((key: 'embedding' | 'rerank' | 'vision' | 'whisper'): string | null => {
         if (!config || !modelStatus?.assets) return null;
-        
+
         let activeId: string | undefined;
         switch (key) {
             case 'embedding':
@@ -233,12 +231,12 @@ export function ModelManagement() {
                 activeId = config.activeAudioModelId;
                 break;
         }
-        
+
         if (!activeId) return null;
-        
+
         const asset = modelStatus.assets.find(a => a.id === activeId);
         return asset?.label ?? activeId;
-    }, [config, modelStatus?.assets]);
+    }, [config, modelStatus]);
 
     const mergedServices = useMemo(() => {
         const runtimeLabels: Record<keyof ModelRuntimeStatus, string> = {
