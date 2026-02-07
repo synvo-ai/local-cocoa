@@ -5,7 +5,7 @@
  * Plugin order and enabled state are configurable in Settings.
  */
 
-import { useState, useCallback, useEffect, CSSProperties, ComponentType } from 'react';
+import { useState, useCallback, useMemo, CSSProperties, ComponentType } from 'react';
 import { Activity, Mail, StickyNote, Puzzle, Brain, Link2, Mic, Loader2, Settings2, X, FolderKanban } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { EmailConnectorsPanel } from './EmailConnectorsPanel';
@@ -23,6 +23,7 @@ import { useEmailData } from '../hooks/useEmailData';
 import { useNotesData } from '../hooks/useNotesData';
 import { usePluginConfig } from '../hooks/usePluginConfig';
 import { useMbtiAnalysis } from '../hooks/useMbtiAnalysis';
+import { OpenClawPanel } from './OpenClawPanel';
 
 // Icon map for dynamic icon lookup
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
@@ -49,13 +50,25 @@ export function ExtensionsView({
     // Unsupported tabs will display "Unsupported yet" message when selected
     const { enabledTabs, loading: pluginsLoading, refresh: refreshPlugins } = usePluginConfig();
     
-    const [activeTab, setActiveTab] = useState<string>(initialTab || '');
+    const [selectedTab, setSelectedTab] = useState<string | null>(null);
     const [notification, setNotification] = useState<{ message: string; action?: { label: string; onClick: () => void } } | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    
+
     // Email sub-view state: 'accounts' | 'memory'
     type EmailSubView = 'accounts' | 'memory';
     const [emailSubView, setEmailSubView] = useState<EmailSubView>('accounts');
+
+    // Compute active tab: user selection takes precedence, otherwise use initialTab or first enabled
+    const activeTab = useMemo(() => {
+        if (selectedTab && enabledTabs.some(t => t.id === selectedTab)) {
+            return selectedTab;
+        }
+        if (enabledTabs.length === 0) return '';
+        const validInitialTab = initialTab && enabledTabs.some(t => t.id === initialTab);
+        return validInitialTab ? initialTab : enabledTabs[0].id;
+    }, [selectedTab, enabledTabs, initialTab]);
+
+    const setActiveTab = setSelectedTab;
 
     // Handler for closing settings panel - refresh data when closing
     const handleCloseSettings = useCallback(() => {
@@ -66,15 +79,6 @@ export function ExtensionsView({
 
     const dragStyle = { WebkitAppRegion: 'drag' } as CSSProperties;
     const noDragStyle = { WebkitAppRegion: 'no-drag' } as CSSProperties;
-
-    // Set initial active tab when plugins load
-    useEffect(() => {
-        if (enabledTabs.length > 0 && !activeTab) {
-            // Use initialTab if provided and valid, otherwise use first enabled tab
-            const validInitialTab = initialTab && enabledTabs.some(t => t.id === initialTab);
-            setActiveTab(validInitialTab ? initialTab : enabledTabs[0].id);
-        }
-    }, [enabledTabs, activeTab, initialTab]);
 
     // Use workspace data hook
     const {
@@ -350,6 +354,13 @@ export function ExtensionsView({
                             setProgress={setMbtiProgress}
                             files={mbtiFiles}
                         />
+                    </div>
+                );
+            
+            case 'openclaw':
+                return (
+                    <div className="h-full w-full overflow-hidden">
+                        <OpenClawPanel />
                     </div>
                 );
             

@@ -29,6 +29,7 @@ interface SanitizePattern {
  */
 export class LogSanitizer {
     private enabled: boolean;
+    private sanitizePathsEnabled: boolean;
     private patterns: SanitizePattern[];
     private username: string | null;
     private pathCache: Map<string, string>;
@@ -38,6 +39,9 @@ export class LogSanitizer {
         // Check environment variable for override
         const envEnabled = process.env.LOG_SANITIZE_ENABLED?.toLowerCase();
         this.enabled = enabled && (!envEnabled || ['true', '1', 'yes'].includes(envEnabled));
+        const envPathSanitize = process.env.LOG_SANITIZE_PATHS?.toLowerCase();
+        // Path username masking is opt-in; keep real paths visible in local dev logs by default.
+        this.sanitizePathsEnabled = !!envPathSanitize && ['true', '1', 'yes'].includes(envPathSanitize);
         this.patterns = this.compilePatterns();
         this.username = this.getCurrentUsername();
         this.pathCache = new Map();
@@ -201,8 +205,8 @@ export class LogSanitizer {
             }
         }
 
-        // Sanitize file paths to remove usernames
-        if (this.username) {
+        // Optionally sanitize file paths to remove usernames.
+        if (this.sanitizePathsEnabled && this.username) {
             sanitized = this.sanitizePath(sanitized);
         }
 
@@ -285,4 +289,3 @@ export function createSanitizingHook() {
 }
 
 export default LogSanitizer;
-

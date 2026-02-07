@@ -1,0 +1,17 @@
+{
+    "id": "openclaw",
+    "name": "OpenClaw",
+    "version": "1.0.0",
+    "description": "OpenClaw Telegram integration panel.",
+    "author": "Local Cocoa",
+    "category": "integration",
+    "icon": "Puzzle",
+    "frontend": {
+        "tab": {
+            "id": "openclaw",
+            "label": "OpenClaw",
+            "icon": "Puzzle",
+            "component": "OpenClawPanel"
+        }
+    }
+}
