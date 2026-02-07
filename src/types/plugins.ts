@@ -86,6 +86,7 @@ export const DEFAULT_PLUGINS_ORDER: string[] = [
     'earlog',
     'mbti',
     'desktop_organizer',
+    'openclaw'
 ];
 
 /**
@@ -96,6 +97,7 @@ export const SUPPORTED_PLUGINS: string[] = [
     'mcp',
     'notes',
     'mail',
+    'openclaw'
 ];
 
 /**
