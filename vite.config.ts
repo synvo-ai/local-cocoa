@@ -39,7 +39,7 @@ export default defineConfig({
     },
     resolve: {
         alias: {
-            '@': path.resolve(__dirname, 'src/renderer'),
+            '@': path.resolve(__dirname, 'src'),
             // Standard alias for system plugins
             'system-plugins': path.resolve(__dirname, 'plugins'),
             // Dynamic alias for user plugins directory. Can be configured via LOCAL_USER_PLUGINS_ROOT environment variable

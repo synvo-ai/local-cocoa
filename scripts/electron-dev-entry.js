@@ -25,5 +25,15 @@ require('ts-node').register({
     }
 });
 
+// Below added for plugins so that they can import from local-cocoa/src using @ instead of relative paths
+// TODO: Isolate plugins completely from main and remove this part
+const tsConfig = require('../tsconfig.json');
+const tsConfigPaths = require('tsconfig-paths');
+
+tsConfigPaths.register({
+    baseUrl: rootDir,      // Ensure this points to where src is
+    paths: tsConfig.compilerOptions.paths
+});
+
 require('../src/main/main.ts');
 

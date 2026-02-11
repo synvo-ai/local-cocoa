@@ -32,7 +32,6 @@ import { registerSystemHandlers } from './ipc/system';
 import { registerScanHandlers } from './ipc/scan';
 import { registerMemoryHandlers } from './ipc/memory';
 import { initPluginManager } from './plugins';
-import { startDirectMCPServer } from './mcpDirectServer';
 import { ModelDownloadEvent } from './types';
 
 process.on('uncaughtException', (error) => {
@@ -120,9 +119,6 @@ async function startServices() {
         LOCAL_SERVICE_DEBUG_WAIT: process.env.LOCAL_SERVICE_DEBUG_WAIT ?? 'false',
         LOCAL_SERVICE_DEBUG_PORT: process.env.LOCAL_SERVICE_DEBUG_PORT ?? ''
     });
-
-    // Start MCP Direct Server (port 5566)
-    startDirectMCPServer(windowManager);
 
     console.log('[Main] Starting services with config:', modelConfig);
 

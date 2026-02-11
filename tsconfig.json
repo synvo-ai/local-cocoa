@@ -20,8 +20,12 @@
         "jsx": "react-jsx",
         "baseUrl": ".",
         "paths": {
-            "@/*": ["src/renderer/*"],
-            "user-plugins/*": ["../synvo-local/*"]
+            "@/*": [
+                "src/*"
+            ],
+            "user-plugins/*": [
+                "../synvo-local/*"
+            ]
         }
     },
     "include": [
@@ -29,7 +33,7 @@
         "src/types",
         "src/preload/preload.d.ts",
         "scripts/electron-dev-entry.js",
-        "plugins",
+        "plugins"
     ],
     "references": [
         {

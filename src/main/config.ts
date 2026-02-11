@@ -16,8 +16,8 @@ const projectRoot = path.resolve(__dirname, '../..');
 // In production, use Electron's userData path
 //    Mac:  ~/Library/Application Support/Local Cocoa/
 //    Win:  c:/Users/<user name>/AppData/Roaming/Local Cocoa/
-const runtimeRoot = process.env.LOCAL_RUNTIME_ROOT 
-    ? path.resolve(process.env.LOCAL_RUNTIME_ROOT) 
+const runtimeRoot = process.env.LOCAL_RUNTIME_ROOT
+    ? path.resolve(process.env.LOCAL_RUNTIME_ROOT)
     : (isDev ? path.join(projectRoot, 'runtime') : app.getPath('userData'));
 
 // Resource root directory, all static (read-only) data files are stored here.
@@ -61,7 +61,7 @@ export const config = {
     },
     get urls() {
         return {
-            backend: process.env.LOCAL_RAG_API_URL,
+            backendApiBase: process.env.LOCAL_SERVICE_MAIN_URL,
         };
     },
     get paths() {
@@ -107,7 +107,7 @@ export const config = {
     get debugMode() {
         return process.env.DEBUG?.toLowerCase() === 'true';
     },
-    get logLevel() { return process.env.LOCAL_LOG_LEVEL ?? 'info'; },
+    get logLevel() { return process.env.LOG_LEVEL ?? 'info'; },
     get backend() {
         return {
             launchPythonServer: process.env.LOCAL_SERVICE_LAUNCH_PYTHON_SERVER?.toLowerCase() === 'true',

@@ -4,14 +4,16 @@
  * Moved from src/main/backendClient.ts for plugin modularity
  */
 
-import { requestJson } from '../../../../src/main/backendClient';
+import { requestJson } from '@/main/backendClient';
 import type {
     NoteSummary,
     NoteContent,
     NoteDraftPayload,
 } from '../types';
 
-const NOTES_PLUGIN_PREFIX = '/plugins/synvo_ai_notes';
+import { API_PREFIX } from '../config';
+
+const NOTES_PLUGIN_PREFIX = API_PREFIX;
 
 // ==================== Mapper Functions ====================
 

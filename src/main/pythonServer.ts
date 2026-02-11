@@ -107,7 +107,7 @@ export class PythonServer {
 
             if (this.sessionToken) {
                 try {
-                    const response = await fetch(`${config.urls.backend}/health`, {
+                    const response = await fetch(`${config.urls.backendApiBase}/health`, {
                         method: 'GET',
                         headers: {
                             'X-API-Key': this.sessionToken

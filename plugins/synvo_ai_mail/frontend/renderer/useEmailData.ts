@@ -1,5 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
-import type { EmailAccountSummary, EmailMessageSummary, EmailMessageContent, EmailAccountPayload } from '../../../../src/renderer/types';
+import type {
+    EmailAccountSummary,
+    EmailMessageSummary,
+    EmailMessageContent,
+    EmailAccountPayload
+} from '../types';
+import { mailAPI } from './api';
 
 interface EmailSyncState {
     status: 'idle' | 'syncing' | 'ok' | 'error';
@@ -40,12 +46,8 @@ export function useEmailData(emailAccounts: EmailAccountSummary[], refreshData: 
 
     const handleAddEmailAccount = useCallback(
         async (payload: EmailAccountPayload) => {
-            const api = window.api;
-            if (!api?.addEmailAccount) {
-                throw new Error('Email bridge unavailable.');
-            }
             try {
-                await api.addEmailAccount(payload);
+                await mailAPI.addAccount(payload);
                 await refreshData();
             } catch (error) {
                 throw error instanceof Error ? error : new Error('Unable to save email connector.');
@@ -56,12 +58,8 @@ export function useEmailData(emailAccounts: EmailAccountSummary[], refreshData: 
 
     const handleRemoveEmailAccount = useCallback(
         async (accountId: string) => {
-            const api = window.api;
-            if (!api?.removeEmailAccount) {
-                throw new Error('Email bridge unavailable.');
-            }
             try {
-                await api.removeEmailAccount(accountId);
+                await mailAPI.removeAccount(accountId);
                 setEmailSyncStates((prev) => {
                     const { [accountId]: _removed, ...rest } = prev;
                     return rest;
@@ -94,11 +92,6 @@ export function useEmailData(emailAccounts: EmailAccountSummary[], refreshData: 
 
     const handleSyncEmailAccount = useCallback(
         async (accountId: string) => {
-            const api = window.api;
-            if (!api?.syncEmailAccount) {
-                console.warn('Email sync bridge unavailable.');
-                return;
-            }
             setEmailSyncStates((prev) => ({
                 ...prev,
                 [accountId]: {
@@ -108,7 +101,7 @@ export function useEmailData(emailAccounts: EmailAccountSummary[], refreshData: 
                 }
             }));
             try {
-                const result = await api.syncEmailAccount(accountId);
+                const result = await mailAPI.syncAccount(accountId);
                 setEmailSyncStates((prev) => ({
                     ...prev,
                     [accountId]: {
@@ -135,14 +128,12 @@ export function useEmailData(emailAccounts: EmailAccountSummary[], refreshData: 
 
     const loadEmailMessages = useCallback(
         async (accountId: string, options?: { force?: boolean }) => {
-            const api = window.api;
-            if (!api?.listEmailMessages) return;
             if (!options?.force && emailMessages[accountId]) {
                 return;
             }
             setLoadingMessagesForAccount(accountId);
             try {
-                const items = await api.listEmailMessages(accountId, 50);
+                const items = await mailAPI.listMessages(accountId, 50);
                 setEmailMessages((prev) => ({ ...prev, [accountId]: items }));
             } catch (error) {
                 console.error('Failed to load email messages', error);
@@ -172,18 +163,14 @@ export function useEmailData(emailAccounts: EmailAccountSummary[], refreshData: 
 
     const handleSelectEmailMessage = useCallback(
         async (accountId: string, messageId: string) => {
-            const api = window.api;
             setSelectedEmailAccountId(accountId);
             setSelectedEmailMessageId(messageId);
             if (emailMessageCache[messageId]) {
                 return;
             }
-            if (!api?.getEmailMessage) {
-                return;
-            }
             setIsEmailMessageLoading(true);
             try {
-                const detail = await api.getEmailMessage(messageId);
+                const detail = await mailAPI.getMessage(messageId);
                 setEmailMessageCache((prev) => ({ ...prev, [messageId]: detail }));
             } catch (error) {
                 console.error('Failed to load email message content', error);

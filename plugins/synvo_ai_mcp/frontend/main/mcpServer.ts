@@ -2,7 +2,7 @@ import { spawn, ChildProcess, execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { app } from 'electron';
-import { config } from './config';
+import { config } from '@/main/config';
 
 /**
  * MCP Server Manager
@@ -97,7 +97,7 @@ export class MCPServer {
 
             // Read API key - try dev session key first, then legacy paths
             let apiKey = '';
-            
+
             const devSessionKeyPath = path.join(config.paths.runtimeRoot, '.dev-session-key');
             if (fs.existsSync(devSessionKeyPath)) {
                 try {

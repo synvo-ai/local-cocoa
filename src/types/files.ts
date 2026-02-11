@@ -59,18 +59,18 @@ export interface FileRecord {
     indexStatus?: FileIndexStatus;
     errorReason?: string | null;
     errorAt?: string | null;
-    
+
     // Two-round indexing stages
     // Round 1 (Fast): 0=pending, 1=text_done, 2=embed_done, -1=error
     fastStage?: StageValue;
     fastTextAt?: string | null;
     fastEmbedAt?: string | null;
-    
+
     // Round 2 (Deep): 0=pending, 1=text_done, 2=embed_done, -1=error, -2=skipped
     deepStage?: StageValue;
     deepTextAt?: string | null;
     deepEmbedAt?: string | null;
-    
+
     // Memory extraction status
     memoryStatus?: MemoryStatus;
     memoryExtractedAt?: string | null;
@@ -248,35 +248,6 @@ export interface QaResponse {
     thinkingSteps?: ThinkingStep[];
 }
 
-// ==================== Email Types (Re-exported from mail plugin) ====================
-// These types have been moved to plugins/mail/frontend/types for modularity
-// Re-exporting here for backward compatibility
-export type {
-    EmailProtocol,
-    EmailAccountPayload,
-    EmailAccountSummary,
-    EmailSyncResult,
-    EmailMessageSummary,
-    EmailMessageContent,
-    AccountMemoryStatus,
-    BuildAccountMemoryResult,
-    AccountQAResult,
-    AccountQASource,
-    MemCellItem,
-    EpisodeItem,
-    FactItem,
-    AccountMemoryDetails,
-} from './plugins/mail';
-
-// ==================== Notes Types (Re-exported from notes plugin) ====================
-// These types have been moved to plugins/notes/frontend/types for modularity
-// Re-exporting here for backward compatibility
-export type {
-    NoteSummary,
-    NoteContent,
-    NoteDraftPayload,
-} from './plugins/notes';
-
 
 export interface ModelAssetStatus {
     id: string;
@@ -303,15 +274,6 @@ export interface ModelDownloadEvent {
     statuses?: ModelAssetStatus[];
     logLine?: string;
 }
-
-// ==================== Activity Types (Re-exported from activity plugin) ====================
-// These types have been moved to plugins/activity/frontend/types for modularity
-// Re-exporting here for backward compatibility
-export type {
-    ActivityLog,
-    ActivityTimelineResponse,
-} from './plugins/activity';
-
 
 export type ThinkingStepStatus = 'pending' | 'running' | 'complete' | 'error';
 

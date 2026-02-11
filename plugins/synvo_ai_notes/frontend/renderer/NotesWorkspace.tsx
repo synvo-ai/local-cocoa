@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { StickyNote, Plus, Trash2, RefreshCw, Database, Save, Edit, Eye, Search, Calendar, Clock, FileText } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import type { IndexingItem, NoteContent, NoteSummary } from '@/types';
+import { cn } from '@/renderer/lib/utils';
+import type { IndexingItem } from '@/renderer/types';
+import type { NoteContent, NoteSummary } from '../types';
 
 interface NotesWorkspaceProps {
     notes: NoteSummary[];

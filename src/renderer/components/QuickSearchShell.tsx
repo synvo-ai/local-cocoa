@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { SearchHit, NoteSummary, NoteContent } from '../types';
+import type { SearchHit } from '../types';
 import { QuickSearchPalette } from './QuickSearchPalette';
 import { useModelConfig } from '../hooks/useModelConfig';
-import { useNotesData } from '../../../plugins/synvo_ai_notes/frontend/renderer/useNotesData';
 
-type PaletteTab = 'search' | 'notes';
+type PaletteTab = 'search';
 
 const RESULT_LIMIT = 20;
 
@@ -44,21 +43,6 @@ export function QuickSearchShell() {
     // Tab state
     const [activeTab, setActiveTab] = useState<PaletteTab>('search');
 
-    // Notes state and logic refactored to shared hook
-    const {
-        notes,
-        selectedNoteId, // Note: internal state _selectedNoteId was unused, renaming for clarity if needed
-        selectedNote,
-        loading: isNotesLoading,
-        saving: isNoteSaving,
-        loadNotes,
-        handleSelectNote,
-        handleCreateNote,
-        handleSaveNote,
-        handleDeleteNote,
-        handleBackToNotesList,
-    } = useNotesData();
-
     useEffect(() => {
         document.body.classList.add('spotlight-shell');
         return () => {
@@ -79,12 +63,6 @@ export function QuickSearchShell() {
 
         return cleanup;
     }, []);
-
-    useEffect(() => {
-        if (activeTab === 'notes') {
-            void loadNotes();
-        }
-    }, [activeTab, loadNotes]);
 
     const runQuery = useCallback(
         async (value: string, modeOverride?: SpotlightMode, resumeTokenArg?: string) => {
@@ -548,18 +526,6 @@ export function QuickSearchShell() {
             resumeToken={resumeToken}
             onSelect={handleSelect}
             onOpen={handleOpen}
-            // Notes props
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            notes={notes}
-            selectedNote={selectedNote}
-            isNotesLoading={isNotesLoading}
-            isNoteSaving={isNoteSaving}
-            onSelectNote={handleSelectNote}
-            onCreateNote={handleCreateNote}
-            onSaveNote={handleSaveNote}
-            onDeleteNote={handleDeleteNote}
-            onBackToNotesList={handleBackToNotesList}
         />
     );
 }

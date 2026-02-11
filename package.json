@@ -6,7 +6,7 @@
     "description": "Local Cocoa personal agent with React renderer and FastAPI backend",
     "main": "dist-electron/main/main.js",
     "scripts": {
-        "dev": "concurrently \"npm:dev:renderer\" \"npm:dev:electron\"",
+        "dev": "concurrently --prefix none \"npm:dev:renderer\" \"npm:dev:electron\"",
         "dev:renderer": "vite --mode dev",
         "dev:electron": "npm run build:electron && cross-env NODE_ENV=dev electron --trace-deprecation scripts/electron-dev-entry.js",
         "build": "npm run build:renderer && npm run build:electron",
@@ -74,6 +74,7 @@
         "postcss": "^8.5.6",
         "tailwindcss": "^4.1.18",
         "ts-node": "^10.9.2",
+        "tsconfig-paths": "^4.2.0",
         "typescript": "^5.9.3",
         "vite": "^7.3.1",
         "vitest": "^4.0.18"

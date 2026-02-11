@@ -1,12 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Mail, Trash2, RefreshCw, AlertCircle, CheckCircle2, Copy, ExternalLink, Plus, X, Brain, Sparkles } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import type { 
-    EmailAccountPayload, 
-    EmailAccountSummary, 
-    IndexingItem, 
-    AccountMemoryStatus
-} from '@/types';
+import { cn } from '@/renderer/lib/utils';
+import type { IndexingItem } from '@/renderer/types';
+import type { EmailAccountPayload, EmailAccountSummary, AccountMemoryStatus } from '../types';
+import { mailAPI } from './api';
 
 interface EmailSyncState {
     status: 'idle' | 'syncing' | 'ok' | 'error';
@@ -67,20 +64,17 @@ export function EmailConnectorsPanel({
     const [form, setForm] = useState<FormState>({ ...DEFAULT_FORM });
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    
+
     // Memory Status State
     const [memoryStatuses, setMemoryStatuses] = useState<Record<string, AccountMemoryStatus>>({});
 
     // Fetch memory status for all accounts on mount and when accounts change
     useEffect(() => {
         const fetchAllMemoryStatuses = async () => {
-            const api = window.api;
-            if (!api?.getAccountMemoryStatus) return;
-            
             const statuses: Record<string, AccountMemoryStatus> = {};
             for (const account of accounts) {
                 try {
-                    const status = await api.getAccountMemoryStatus(account.id);
+                    const status = await mailAPI.getAccountMemoryStatus(account.id);
                     statuses[account.id] = status;
                 } catch (e) {
                     console.error(`Failed to fetch memory status for ${account.id}:`, e);
@@ -88,7 +82,7 @@ export function EmailConnectorsPanel({
             }
             setMemoryStatuses(statuses);
         };
-        
+
         if (accounts.length > 0) {
             fetchAllMemoryStatuses();
         }
@@ -108,8 +102,7 @@ export function EmailConnectorsPanel({
         if (isCompletingRef.current) return;
         isCompletingRef.current = true;
         try {
-            const api = (window as any).api;
-            const account = await api.completeOutlookSetup(flowId, outlookLabel);
+            const account = await mailAPI.completeOutlookSetup(flowId, outlookLabel);
             if (onOutlookConnected) {
                 await onOutlookConnected(account.id);
             }
@@ -131,10 +124,7 @@ export function EmailConnectorsPanel({
 
         const timer = setInterval(async () => {
             try {
-                const api = (window as any).api;
-                if (!api) return;
-                
-                const status = await api.getOutlookAuthStatus(outlookFlowId);
+                const status = await mailAPI.getOutlookAuthStatus(outlookFlowId);
                 if (status.status === 'code_ready') {
                     setOutlookCode(status.info.user_code);
                     setOutlookUrl(status.info.verification_uri);
@@ -159,8 +149,7 @@ export function EmailConnectorsPanel({
         setError(null);
         setOutlookStatus('waiting_for_code');
         try {
-            const api = (window as any).api;
-            const res = await api.startOutlookAuth(outlookClientId, outlookTenantId);
+            const res = await mailAPI.startOutlookAuth(outlookClientId, outlookTenantId);
             setOutlookFlowId(res.flow_id);
         } catch (e: any) {
             setError(e.message);
@@ -240,7 +229,7 @@ export function EmailConnectorsPanel({
                         <div className="absolute -top-20 -right-20 w-56 h-56 bg-primary/10 rounded-full blur-3xl" />
                         <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
                     </div>
-                    
+
                     <div className="relative z-10 flex flex-col items-center">
                         {/* Animated mail icon with glow */}
                         <div className="relative mb-8 group">
@@ -252,7 +241,7 @@ export function EmailConnectorsPanel({
                             <div className="absolute -inset-2.5 border-2 border-primary/20 rounded-[1.25rem] animate-pulse" style={{ animationDuration: '3s' }} />
                             <div className="absolute -inset-5 border border-primary/10 rounded-[1.5rem]" />
                         </div>
-                        
+
                         {/* Content */}
                         <h2 className="text-2xl font-bold text-foreground tracking-tight mb-2">
                             Connect Your Email
@@ -260,7 +249,7 @@ export function EmailConnectorsPanel({
                         <p className="text-muted-foreground max-w-md mb-8 leading-relaxed">
                             Link your email accounts to unlock powerful search and organization features across all your messages.
                         </p>
-                        
+
                         {/* CTA Button with enhanced styling */}
                         <button
                             onClick={() => setIsAdding(true)}
@@ -272,7 +261,7 @@ export function EmailConnectorsPanel({
                                 Add Your First Connector
                             </span>
                         </button>
-                        
+
                         {/* Feature hints */}
                         <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mt-10 text-sm text-muted-foreground">
                             <div className="flex items-center gap-2">
@@ -326,14 +315,14 @@ export function EmailConnectorsPanel({
                                 <X className="h-4 w-4" />
                             </button>
                         </div>
-                        
+
                         <div className="flex border-b bg-muted/40 shrink-0">
                             <button
                                 onClick={() => setActiveTab('standard')}
                                 className={cn(
                                     "flex-1 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px text-center",
-                                    activeTab === 'standard' 
-                                        ? "border-primary text-foreground bg-background" 
+                                    activeTab === 'standard'
+                                        ? "border-primary text-foreground bg-background"
                                         : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60"
                                 )}
                             >
@@ -343,8 +332,8 @@ export function EmailConnectorsPanel({
                                 onClick={() => setActiveTab('outlook')}
                                 className={cn(
                                     "flex-1 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px text-center",
-                                    activeTab === 'outlook' 
-                                        ? "border-primary text-foreground bg-background" 
+                                    activeTab === 'outlook'
+                                        ? "border-primary text-foreground bg-background"
                                         : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60"
                                 )}
                             >
@@ -534,13 +523,13 @@ export function EmailConnectorsPanel({
                                                     </p>
                                                 </div>
                                             </div>
-                                            
+
                                             <div className="flex flex-col gap-4 bg-muted/50 p-4 rounded-md border">
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Verification URL</span>
-                                                    <a 
-                                                        href={outlookUrl} 
-                                                        target="_blank" 
+                                                    <a
+                                                        href={outlookUrl}
+                                                        target="_blank"
                                                         rel="noreferrer"
                                                         className="text-sm font-medium text-blue-600 hover:underline flex items-center gap-1"
                                                     >
@@ -554,7 +543,7 @@ export function EmailConnectorsPanel({
                                                         <code className="text-xl font-mono font-bold tracking-wider bg-background px-3 py-1 rounded border">
                                                             {outlookCode}
                                                         </code>
-                                                        <button 
+                                                        <button
                                                             onClick={() => navigator.clipboard.writeText(outlookCode)}
                                                             className="p-2 hover:bg-background rounded-md transition-colors"
                                                             title="Copy code"
@@ -593,7 +582,7 @@ export function EmailConnectorsPanel({
                     const accountPending = pendingByAccount[account.id] ?? [];
                     const processingCount = accountPending.filter((item) => item.status === 'processing').length;
                     const pendingCount = accountPending.filter((item) => item.status === 'pending').length;
-                    
+
                     return (
                         <div
                             key={account.id}
@@ -674,7 +663,7 @@ export function EmailConnectorsPanel({
                                     <span className="text-muted-foreground">Status</span>
                                     <span className={cn(
                                         "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium",
-                                        syncState.status === 'error' 
+                                        syncState.status === 'error'
                                             ? "bg-destructive/10 text-destructive"
                                             : syncState.status === 'ok'
                                                 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
@@ -701,7 +690,7 @@ export function EmailConnectorsPanel({
                                         )}
                                     </span>
                                 </div>
-                                
+
                                 {/* Memory Status */}
                                 <div className="flex items-center justify-between text-sm pt-2 border-t">
                                     <span className="text-muted-foreground flex items-center gap-1.5">
@@ -732,7 +721,7 @@ export function EmailConnectorsPanel({
                                             <span>{Math.round((processingCount / (processingCount + pendingCount || 1)) * 100)}%</span>
                                         </div>
                                         <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                                            <div 
+                                            <div
                                                 className="h-full bg-primary transition-all duration-500 ease-out"
                                                 style={{ width: `${Math.round((processingCount / (processingCount + pendingCount || 1)) * 100)}%` }}
                                             />
@@ -744,7 +733,7 @@ export function EmailConnectorsPanel({
                                     </div>
                                 </div>
                             )}
-                            
+
                             {syncState.status === 'error' && syncState.message && (
                                 <div className="mt-4 pt-4 border-t">
                                     <p className="text-xs text-destructive truncate" title={syncState.message}>

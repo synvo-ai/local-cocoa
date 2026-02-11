@@ -1,7 +1,7 @@
 import { IncomingMessage, request } from 'http';
 import { URL } from 'url';
-import { WindowManager } from './windowManager';
-import { getLocalKey } from './backendClient';
+import { WindowManager } from '@/main/windowManager';
+import { getLocalKey } from '@/main/backendClient';
 
 export function startMCPMonitor(windowManager: WindowManager) {
     const apiBase = process.env.LOCAL_RAG_API_URL || 'http://127.0.0.1:8890';
@@ -93,7 +93,7 @@ export function startMCPMonitor(windowManager: WindowManager) {
             });
         });
 
-        req.on('error', (e) => {
+        req.on('error', () => {
             setTimeout(connect, 5000);
         });
 

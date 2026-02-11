@@ -307,10 +307,9 @@ export class ModelManager extends EventEmitter {
                 whisper_model: whisperModelPath
             };
 
-            const backendUrl = config.urls.backend || 'http://127.0.0.1:8890';
             // Use node-fetch or built-in fetch (available in Electron main process/Node 18+)
             // We need to handle connection errors in case backend isn't running yet
-            const response = await fetch(`${backendUrl}/models/config`, {
+            const response = await fetch(`${config.urls.backendApiBase}/models/config`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)

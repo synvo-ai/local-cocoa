@@ -3,7 +3,7 @@
  * Defines the structure of plugins, their metadata, and UI extension points
  */
 
-export type PluginUIEntryType = 
+export type PluginUIEntryType =
     | 'primary'      // Primary entry point (top-level tab in sidebar)
     | 'secondary'    // Secondary entry point (sub-tab within a primary entry)
     | 'settings';    // Tab within the Settings panel
@@ -24,14 +24,14 @@ export interface PluginManifest {
     description?: string;                    // Short description
     author?: string;                         // Author name
     homepage?: string;                       // Homepage URL
-    
+
     // Capabilities
     frontend?: {
         entrypoint: string;                  // Path to main HTML/JS file relative to frontend/
         uiEntries?: PluginUIEntry[];         // UI extension points this plugin provides
         preloadScript?: string;              // Custom preload script (optional)
     };
-    
+
     backend?: {
         entrypoint: string;                  // Python module path relative to backend/ (e.g., "router")
         routerModule?: string;               // Module containing the FastAPI router
@@ -39,21 +39,21 @@ export interface PluginManifest {
         dbMigrate?: string;                  // Database migration script
         requirements?: string;               // requirements.txt path
     };
-    
+
     // Dependencies
     dependencies?: {
         plugins?: string[];                  // Other plugins this depends on
         minAppVersion?: string;              // Minimum app version required
     };
-    
+
     // Permissions
     permissions?: string[];                  // Required permissions (future use)
-    
+
     // Plugin category
     category?: 'core' | 'productivity' | 'integration' | 'custom';
 }
 
-export type PluginStatus = 
+export type PluginStatus =
     | 'installed'    // Installed but not loaded
     | 'loading'      // Currently loading
     | 'active'       // Loaded and running
@@ -65,10 +65,11 @@ export interface PluginInstance {
     status: PluginStatus;
     error?: string;
     path: string;                            // Path to plugin directory
-    
+
     // Runtime state
     webviewId?: number;                      // BrowserView ID if using webview isolation
     backendLoaded?: boolean;                 // Whether backend router is registered
+    module?: any;                            // Loaded entrypoint module
 }
 
 export interface PluginRegistry {
@@ -88,29 +89,29 @@ export interface PluginAPI {
     // Plugin identity
     getPluginId(): string;
     getManifest(): PluginManifest;
-    
+
     // Communication with main process
     invoke(channel: string, ...args: unknown[]): Promise<unknown>;
     send(channel: string, ...args: unknown[]): void;
     on(channel: string, callback: (...args: unknown[]) => void): () => void;
-    
+
     // Backend API access (proxied through main process)
     backendRequest<T>(endpoint: string, options?: RequestInit): Promise<T>;
-    
+
     // Storage (scoped to plugin)
     storage: {
         get<T>(key: string): Promise<T | null>;
         set<T>(key: string, value: T): Promise<void>;
         delete(key: string): Promise<void>;
     };
-    
+
     // UI utilities
     showNotification(message: string, options?: { type?: 'info' | 'success' | 'warning' | 'error' }): void;
     navigate(view: string, params?: Record<string, string>): void;
 }
 
 // Events emitted by the plugin system
-export type PluginSystemEvent = 
+export type PluginSystemEvent =
     | { type: 'plugin-loaded'; pluginId: string }
     | { type: 'plugin-unloaded'; pluginId: string }
     | { type: 'plugin-error'; pluginId: string; error: string }

@@ -1,6 +1,6 @@
 import http from 'http';
-import { WindowManager } from './windowManager';
-import { config } from './config';
+import { WindowManager } from '@/main/windowManager';
+import { config } from '@/main/config';
 
 export function startDirectMCPServer(windowManager: WindowManager) {
     const server = http.createServer(async (req, res) => {

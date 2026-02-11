@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, RefreshCw, Mail, Calendar, User, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { cn } from '@/lib/utils';
+import { cn } from '@/renderer/lib/utils';
 import type {
     EmailMessageSummary,
     EmailMessageContent
-} from '@/types';
+} from '../types';
 
 interface EmailBrowserProps {
     messages: EmailMessageSummary[];
@@ -109,7 +109,7 @@ export function EmailBrowser({
             {/* Split View */}
             <div ref={containerRef} className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 {/* Top: Message List */}
-                <div 
+                <div
                     className={cn("overflow-y-auto bg-muted/10")}
                     style={{ height: selectedMessageId ? `${listHeight}%` : '100%' }}
                 >
@@ -172,7 +172,7 @@ export function EmailBrowser({
                         >
                             <div className="w-8 h-0.5 bg-muted-foreground/20 rounded-full" />
                         </div>
-                        
+
                         <div className="flex-1 flex flex-col min-h-0 bg-background overflow-hidden">
                             {loadingContent ? (
                                 <div className="flex h-full items-center justify-center text-muted-foreground">
@@ -187,7 +187,7 @@ export function EmailBrowser({
                                                 {messageContent.subject || '(No Subject)'}
                                             </h1>
                                             {onCloseMessage && (
-                                                <button 
+                                                <button
                                                     onClick={onCloseMessage}
                                                     className="absolute right-0 top-0 p-1.5 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors"
                                                     title="Close preview"
@@ -196,7 +196,7 @@ export function EmailBrowser({
                                                 </button>
                                             )}
                                         </div>
-                                        
+
                                         <div className="flex items-start justify-between gap-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">

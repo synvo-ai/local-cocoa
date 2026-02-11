@@ -6,15 +6,8 @@
     "author": "Local Cocoa",
     "category": "integration",
     "icon": "Link2",
-    "backend": {
-        "entrypoint": "server",
-        "standalone": true,
-        "stdio": true
-    },
-    "main": {
-        "entrypoint": "main.ts"
-    },
     "frontend": {
+        "entrypoint": "frontend/entry.ts",
         "tab": {
             "id": "connections",
             "label": "MCP",
@@ -46,4 +39,3 @@
         }
     ]
 }
-

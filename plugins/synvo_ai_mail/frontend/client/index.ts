@@ -4,7 +4,7 @@
  * Moved from src/main/backendClient.ts for plugin modularity
  */
 
-import { requestJson, resolveEndpoint } from '../../../../src/main/backendClient';
+import { requestJson, resolveEndpoint } from '@/main/backendClient';
 import type {
     EmailAccountPayload,
     EmailAccountSummary,
@@ -17,7 +17,9 @@ import type {
     AccountMemoryDetails,
 } from '../types';
 
-const MAIL_PLUGIN_PREFIX = '/plugins/synvo_ai_mail';
+import { API_PREFIX } from '../config';
+
+const MAIL_PLUGIN_PREFIX = API_PREFIX;
 
 // ==================== Mapper Functions ====================
 
@@ -156,7 +158,7 @@ export async function getEmailMessage(messageId: string): Promise<EmailMessageCo
 // ==================== Account-Level Email Memory Functions ====================
 
 export async function buildAccountMemory(
-    accountId: string, 
+    accountId: string,
     userId: string = 'default_user'
 ): Promise<BuildAccountMemoryResult> {
     const data = await requestJson<any>(
@@ -180,7 +182,7 @@ export async function buildAccountMemory(
 }
 
 export async function getAccountMemoryStatus(
-    accountId: string, 
+    accountId: string,
     userId: string = 'default_user'
 ): Promise<AccountMemoryStatus> {
     const url = new URL(resolveEndpoint(`${MAIL_PLUGIN_PREFIX}/accounts/${encodeURIComponent(accountId)}/memory-status`));

@@ -1,15 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import type {
-    EmailAccountPayload,
-    EmailAccountSummary,
-    EmailMessageContent,
-    EmailMessageSummary,
-    EmailSyncResult,
-    AccountMemoryStatus,
-    AccountMemoryDetails,
-    BuildAccountMemoryResult,
-    AccountQAResult,
     FileListResponse,
     FileRecord,
     FolderRecord,
@@ -17,9 +8,6 @@ import type {
     IndexInventory,
     IndexProgressUpdate,
     IndexSummary,
-    NoteContent,
-    NoteDraftPayload,
-    NoteSummary,
     QaResponse,
     SearchResponse,
     ModelStatusSummary,
@@ -145,34 +133,6 @@ const api = {
         ipcRenderer.invoke('system:export-logs'),
     getLogsPath: (): Promise<string> =>
         ipcRenderer.invoke('system:get-logs-path'),
-    listEmailAccounts: (): Promise<EmailAccountSummary[]> => ipcRenderer.invoke('email:list'),
-    addEmailAccount: (payload: EmailAccountPayload): Promise<EmailAccountSummary> =>
-        ipcRenderer.invoke('email:add', payload),
-    removeEmailAccount: (accountId: string): Promise<{ id: string }> =>
-        ipcRenderer.invoke('email:remove', accountId),
-    syncEmailAccount: (accountId: string, limit?: number): Promise<EmailSyncResult> =>
-        ipcRenderer.invoke('email:sync', { accountId, limit }),
-    listEmailMessages: (accountId: string, limit?: number): Promise<EmailMessageSummary[]> =>
-        ipcRenderer.invoke('email:messages', { accountId, limit }),
-    getEmailMessage: (messageId: string): Promise<EmailMessageContent> =>
-        ipcRenderer.invoke('email:message', { messageId }),
-    // Account-Level Email Memory API (memory-v2.5)
-    buildAccountMemory: (accountId: string, userId?: string): Promise<BuildAccountMemoryResult> =>
-        ipcRenderer.invoke('email:build-account-memory', { accountId, userId }),
-    getAccountMemoryStatus: (accountId: string, userId?: string): Promise<AccountMemoryStatus> =>
-        ipcRenderer.invoke('email:account-memory-status', { accountId, userId }),
-    getAccountMemoryDetails: (accountId: string, userId?: string, limit?: number): Promise<AccountMemoryDetails> =>
-        ipcRenderer.invoke('email:account-memory-details', { accountId, userId, limit }),
-    accountQA: (accountId: string, question: string, userId?: string): Promise<AccountQAResult> =>
-        ipcRenderer.invoke('email:account-qa', { accountId, question, userId }),
-    listNotes: (): Promise<NoteSummary[]> => ipcRenderer.invoke('notes:list'),
-    createNote: (payload: NoteDraftPayload): Promise<NoteSummary> =>
-        ipcRenderer.invoke('notes:create', payload),
-    getNote: (noteId: string): Promise<NoteContent> => ipcRenderer.invoke('notes:get', { noteId }),
-    updateNote: (noteId: string, payload: NoteDraftPayload): Promise<NoteContent> =>
-        ipcRenderer.invoke('notes:update', { noteId, payload }),
-    deleteNote: (noteId: string): Promise<{ id: string }> =>
-        ipcRenderer.invoke('notes:delete', { noteId }),
     showSpotlightWindow: (): Promise<unknown> => ipcRenderer.invoke('spotlight:show'),
     toggleSpotlightWindow: (): Promise<unknown> => ipcRenderer.invoke('spotlight:toggle'),
     hideSpotlightWindow: (): void => {
@@ -216,18 +176,6 @@ const api = {
             ipcRenderer.removeListener(channel, listener);
         };
     },
-    // Notify all windows that notes have changed
-    notifyNotesChanged: (): void => {
-        ipcRenderer.send('notes:changed');
-    },
-    onNotesChanged: (callback: () => void): (() => void) => {
-        const channel = 'notes:refresh';
-        const listener = () => callback();
-        ipcRenderer.on(channel, listener);
-        return () => {
-            ipcRenderer.removeListener(channel, listener);
-        };
-    },
     modelStatus: (): Promise<ModelStatusSummary> => ipcRenderer.invoke('models:status'),
     downloadModels: (): Promise<ModelStatusSummary> => ipcRenderer.invoke('models:download'),
     redownloadModel: (assetId: string): Promise<ModelStatusSummary> => ipcRenderer.invoke('models:redownload', assetId),
@@ -255,10 +203,6 @@ const api = {
         return () => ipcRenderer.removeListener('models:progress', subscription);
     },
 
-    ingestScreenshot: (image: Uint8Array) => ipcRenderer.invoke('activity:ingest', { image }),
-    getActivityTimeline: (start?: string, end?: string, summary?: boolean) => ipcRenderer.invoke('activity:timeline', { start, end, summary }),
-    deleteActivityLog: (logId: string) => ipcRenderer.invoke('activity:delete', { logId }),
-    captureScreen: () => ipcRenderer.invoke('activity:capture'),
     readImage: (filePath: string): Promise<string> => ipcRenderer.invoke('files:read-image', { filePath }),
     askStream: (query: string, limit?: number, mode?: 'qa' | 'chat', callbacks?: {
         onData: (chunk: string) => void;
@@ -285,13 +229,6 @@ const api = {
             ipcRenderer.removeListener(doneChannel, onDone);
         };
     },
-    // Outlook auth
-    startOutlookAuth: (clientId: string, tenantId: string): Promise<{ flow_id: string }> =>
-        ipcRenderer.invoke('email:outlook:auth', { clientId, tenantId }),
-    getOutlookAuthStatus: (flowId: string): Promise<any> =>
-        ipcRenderer.invoke('email:outlook:status', flowId),
-    completeOutlookSetup: (flowId: string, label: string): Promise<EmailAccountSummary> =>
-        ipcRenderer.invoke('email:outlook:complete', { flowId, label }),
 
     listChatSessions: (limit?: number, offset?: number): Promise<ChatSession[]> =>
         ipcRenderer.invoke('chat:list', { limit, offset }),
@@ -597,6 +534,13 @@ const api = {
         return () => {
             ipcRenderer.removeListener(channel, listener);
         };
+    },
+
+    // ========================================
+    // Generic Plugin IPC
+    // ========================================
+    pluginInvoke: (pluginId: string, method: string, ...args: any[]): Promise<any> => {
+        return ipcRenderer.invoke(`plugin:${pluginId}:${method}`, ...args);
     },
 
     // ========================================

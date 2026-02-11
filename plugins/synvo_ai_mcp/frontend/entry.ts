@@ -7,9 +7,10 @@
 import { ipcMain, shell } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import { MCPServer } from '../../src/main/mcpServer';
-import { WindowManager } from '../../src/main/windowManager';
-import { listApiKeys, createApiKey, deleteApiKey, setApiKeyActive, renameApiKey, getOrCreateApiKey } from '../../src/main/backendClient';
+import { MCPServer } from './main/mcpServer';
+import { startDirectMCPServer } from './main/mcpDirectServer';
+import { WindowManager } from '@/main/windowManager';
+import { listApiKeys, createApiKey, deleteApiKey, setApiKeyActive, renameApiKey, getOrCreateApiKey } from '@/main/backendClient';
 
 let mcpServer: MCPServer | null = null;
 
@@ -38,7 +39,7 @@ export function getMCPServer(): MCPServer | null {
  */
 export function registerHandlers(context: { windowManager?: WindowManager }): void {
     const { windowManager } = context;
-    
+
     // Initialize MCP server
     initMCPServer();
 
@@ -289,3 +290,16 @@ export function registerHandlers(context: { windowManager?: WindowManager }): vo
 
     console.log('[MCP Plugin] IPC handlers registered');
 }
+
+
+export function onStartup() {
+    console.log('[MCP Plugin] onStartup');
+
+    // Start MCP Direct Server (port 5566)
+    startDirectMCPServer(WindowManager);
+}
+
+export function onStop() {
+    console.log('[MCP Plugin] onStop');
+}
+

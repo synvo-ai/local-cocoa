@@ -1,10 +1,6 @@
-/**
- * Notes Plugin Data Hook
- * Centralizes notes CRUD operations for consistent use across the plugin and core app.
- */
-
 import { useState, useCallback } from 'react';
-import type { NoteSummary, NoteContent } from '@/types';
+import type { NoteSummary, NoteContent } from '../types';
+import { notesAPI } from './api';
 
 export function useNotesData() {
     const [notes, setNotes] = useState<NoteSummary[]>([]);
@@ -14,12 +10,9 @@ export function useNotesData() {
     const [saving, setSaving] = useState(false);
 
     const loadNotes = useCallback(async () => {
-        const api = window.api;
-        if (!api?.listNotes) return;
-
         setLoading(true);
         try {
-            const notesList = await api.listNotes();
+            const notesList = await notesAPI.listNotes();
             setNotes(notesList);
         } catch (error) {
             console.error('[NotesPlugin] Failed to load notes:', error);
@@ -29,13 +22,10 @@ export function useNotesData() {
     }, []);
 
     const handleSelectNote = useCallback(async (noteId: string) => {
-        const api = window.api;
-        if (!api?.getNote) return;
-
         setSelectedNoteId(noteId);
         setLoading(true);
         try {
-            const note = await api.getNote(noteId);
+            const note = await notesAPI.getNote(noteId);
             setSelectedNote(note);
         } catch (error) {
             console.error('[NotesPlugin] Failed to load note:', error);
@@ -45,31 +35,25 @@ export function useNotesData() {
     }, []);
 
     const handleCreateNote = useCallback(async () => {
-        const api = window.api;
-        if (!api?.createNote) return;
-
         try {
             const now = new Date();
             const defaultTitle = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-            const newNote = await api.createNote({ title: defaultTitle, body: '' });
+            const newNote = await notesAPI.createNote({ title: defaultTitle, body: '' });
             await loadNotes();
             await handleSelectNote(newNote.id);
-            api.notifyNotesChanged?.();
+            (window.api as any)?.notifyNotesChanged?.();
         } catch (error) {
             console.error('[NotesPlugin] Failed to create note:', error);
         }
     }, [loadNotes, handleSelectNote]);
 
     const handleSaveNote = useCallback(async (noteId: string, payload: { title: string; body: string }) => {
-        const api = window.api;
-        if (!api?.updateNote) return;
-
         setSaving(true);
         try {
-            const updated = await api.updateNote(noteId, payload);
+            const updated = await notesAPI.updateNote(noteId, payload);
             setSelectedNote(updated);
             await loadNotes();
-            api.notifyNotesChanged?.();
+            (window.api as any)?.notifyNotesChanged?.();
         } catch (error) {
             console.error('[NotesPlugin] Failed to save note:', error);
         } finally {
@@ -78,15 +62,12 @@ export function useNotesData() {
     }, [loadNotes]);
 
     const handleDeleteNote = useCallback(async (noteId: string) => {
-        const api = window.api;
-        if (!api?.deleteNote) return;
-
         try {
-            await api.deleteNote(noteId);
+            await notesAPI.deleteNote(noteId);
             setSelectedNoteId(null);
             setSelectedNote(null);
             await loadNotes();
-            api.notifyNotesChanged?.();
+            (window.api as any)?.notifyNotesChanged?.();
         } catch (error) {
             console.error('[NotesPlugin] Failed to delete note:', error);
         }
@@ -95,7 +76,7 @@ export function useNotesData() {
     const handleBackToNotesList = useCallback(() => {
         setSelectedNoteId(null);
         setSelectedNote(null);
-        window.api?.notifyNotesChanged?.();
+        (window.api as any)?.notifyNotesChanged?.();
     }, []);
 
     return {

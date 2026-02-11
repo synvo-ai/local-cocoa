@@ -1,26 +1,29 @@
 import { useState, useCallback } from 'react';
 import { Mail, Brain } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '@/renderer/lib/utils';
 import { EmailBrowser } from './EmailBrowser';
 import { EmailConnectorsPanel } from './EmailConnectorsPanel';
 import { EmailQAPage } from './EmailQAPage';
 import { useEmailData } from './useEmailData';
+import { useEmailPluginData } from '../hooks/useEmailPluginData';
 
 interface MailPluginMainProps {
-    emailAccounts: any[];
     isIndexing: boolean;
-    emailIndexingByAccount: any;
     refreshData: () => Promise<void>;
 }
 
 export function MailPluginMain({
-    emailAccounts,
     isIndexing,
-    emailIndexingByAccount,
     refreshData
 }: MailPluginMainProps) {
+    const {
+        emailAccounts,
+        emailIndexingByAccount,
+        refreshData: refreshPluginData
+    } = useEmailPluginData();
+
     const [emailSubView, setEmailSubView] = useState<'accounts' | 'memory'>('accounts');
-    
+
     const {
         emailSyncStates,
         emailMessages,
@@ -37,7 +40,7 @@ export function MailPluginMain({
         handleSelectEmailMessage,
         handleRefreshEmailMessages,
         handleCloseEmailMessage,
-    } = useEmailData(emailAccounts, refreshData);
+    } = useEmailData(emailAccounts, refreshPluginData);
 
     // Re-implementation of handlers from ExtensionsView if they are not in useEmailData
     const handleRescanEmailIndex = useCallback(async (folderId: string) => {
@@ -95,7 +98,7 @@ export function MailPluginMain({
                     </div>
                 </div>
             )}
-            
+
             {/* Sub-view content */}
             <div className="flex-1 overflow-hidden">
                 {selectedEmailAccountId ? (

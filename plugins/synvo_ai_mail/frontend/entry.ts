@@ -13,32 +13,34 @@ import {
     getAccountMemoryStatus,
     getAccountMemoryDetails,
     accountQA
-} from '../../src/main/backendClient';
-import { EmailAccountPayload } from '../../src/main/types';
+} from './client';
+import type { EmailAccountPayload } from './types';
+
+const PLUGIN_ID = 'synvo_ai_mail';
 
 export function registerHandlers() {
-    ipcMain.handle('email:list', async () => listEmailAccounts());
+    ipcMain.handle(`plugin:${PLUGIN_ID}:list`, async () => listEmailAccounts());
 
-    ipcMain.handle('email:add', async (_event, payload: EmailAccountPayload) => {
+    ipcMain.handle(`plugin:${PLUGIN_ID}:add`, async (_event, payload: EmailAccountPayload) => {
         if (!payload?.host || !payload.username || !payload.password || !payload.label) {
             throw new Error('Incomplete email connector payload.');
         }
         return addEmailAccount(payload);
     });
 
-    ipcMain.handle('email:outlook:auth', async (_event, payload: { clientId: string; tenantId: string }) => {
+    ipcMain.handle(`plugin:${PLUGIN_ID}:outlook:auth`, async (_event, payload: { clientId: string; tenantId: string }) => {
         return startOutlookAuth(payload.clientId, payload.tenantId);
     });
 
-    ipcMain.handle('email:outlook:status', async (_event, flowId: string) => {
+    ipcMain.handle(`plugin:${PLUGIN_ID}:outlook:status`, async (_event, flowId: string) => {
         return getOutlookAuthStatus(flowId);
     });
 
-    ipcMain.handle('email:outlook:complete', async (_event, payload: { flowId: string; label: string }) => {
+    ipcMain.handle(`plugin:${PLUGIN_ID}:outlook:complete`, async (_event, payload: { flowId: string; label: string }) => {
         return completeOutlookSetup(payload.flowId, payload.label);
     });
 
-    ipcMain.handle('email:remove', async (_event, accountId: string) => {
+    ipcMain.handle(`plugin:${PLUGIN_ID}:remove`, async (_event, accountId: string) => {
         if (!accountId) {
             throw new Error('Missing email account id.');
         }
@@ -46,7 +48,7 @@ export function registerHandlers() {
         return { id: accountId };
     });
 
-    ipcMain.handle('email:sync', async (_event, payload: { accountId: string; limit?: number }) => {
+    ipcMain.handle(`plugin:${PLUGIN_ID}:sync`, async (_event, payload: { accountId: string; limit?: number }) => {
         const accountId = payload?.accountId;
         if (!accountId) {
             throw new Error('Missing email account id.');
@@ -54,7 +56,7 @@ export function registerHandlers() {
         return syncEmailAccount(accountId, payload?.limit);
     });
 
-    ipcMain.handle('email:messages', async (_event, payload: { accountId: string; limit?: number }) => {
+    ipcMain.handle(`plugin:${PLUGIN_ID}:messages`, async (_event, payload: { accountId: string; limit?: number }) => {
         const accountId = payload?.accountId;
         if (!accountId) {
             throw new Error('Missing email account id.');
@@ -62,7 +64,7 @@ export function registerHandlers() {
         return listEmailMessages(accountId, payload?.limit);
     });
 
-    ipcMain.handle('email:message', async (_event, payload: { messageId: string }) => {
+    ipcMain.handle(`plugin:${PLUGIN_ID}:message`, async (_event, payload: { messageId: string }) => {
         const messageId = payload?.messageId;
         if (!messageId) {
             throw new Error('Missing email message id.');
@@ -72,9 +74,9 @@ export function registerHandlers() {
 
     // ==================== Account-Level Memory Handlers (memory-v2.5) ====================
 
-    ipcMain.handle('email:build-account-memory', async (_event, payload: { 
-        accountId: string; 
-        userId?: string; 
+    ipcMain.handle(`plugin:${PLUGIN_ID}:build-account-memory`, async (_event, payload: {
+        accountId: string;
+        userId?: string;
     }) => {
         const accountId = payload?.accountId;
         if (!accountId) {
@@ -83,8 +85,8 @@ export function registerHandlers() {
         return buildAccountMemory(accountId, payload.userId);
     });
 
-    ipcMain.handle('email:account-memory-status', async (_event, payload: { 
-        accountId: string; 
+    ipcMain.handle(`plugin:${PLUGIN_ID}:account-memory-status`, async (_event, payload: {
+        accountId: string;
         userId?: string;
     }) => {
         const accountId = payload?.accountId;
@@ -94,8 +96,8 @@ export function registerHandlers() {
         return getAccountMemoryStatus(accountId, payload.userId);
     });
 
-    ipcMain.handle('email:account-memory-details', async (_event, payload: { 
-        accountId: string; 
+    ipcMain.handle(`plugin:${PLUGIN_ID}:account-memory-details`, async (_event, payload: {
+        accountId: string;
         userId?: string;
         limit?: number;
     }) => {
@@ -106,8 +108,8 @@ export function registerHandlers() {
         return getAccountMemoryDetails(accountId, payload.userId, payload.limit);
     });
 
-    ipcMain.handle('email:account-qa', async (_event, payload: { 
-        accountId: string; 
+    ipcMain.handle(`plugin:${PLUGIN_ID}:account-qa`, async (_event, payload: {
+        accountId: string;
         question: string;
         userId?: string;
     }) => {

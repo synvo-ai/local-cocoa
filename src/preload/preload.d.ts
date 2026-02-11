@@ -1,28 +1,12 @@
 import type {
-    EmailAccountPayload,
-    EmailAccountSummary,
-    EmailMessageContent,
-    EmailMessageSummary,
-    EmailSyncResult,
-    AccountMemoryStatus,
-    AccountMemoryDetails,
-    BuildAccountMemoryResult,
-    AccountQAResult,
     FileListResponse,
     FolderRecord,
     HealthStatus,
     IndexInventory,
     IndexProgressUpdate,
     IndexSummary,
-    NoteContent,
-    NoteDraftPayload,
-    NoteSummary,
     QaResponse,
     SearchResponse,
-    ModelStatusSummary,
-    ModelDownloadEvent,
-    ActivityLog,
-    ActivityTimelineResponse,
     ChatSession,
     ConversationMessage,
     ChunkSnapshot,
@@ -39,7 +23,7 @@ type RunIndexOptions = {
 
 declare global {
     interface Window {
-        api?: {
+        api: {
             pickFolders: () => Promise<string[]>;
             listFolders: () => Promise<FolderRecord[]>;
             addFolder: (path: string, label?: string, scanMode?: 'full' | 'manual') => Promise<FolderRecord>;
@@ -54,7 +38,7 @@ declare global {
             resumeIndexing: () => Promise<IndexProgressUpdate>;
             indexInventory: (options?: { folderId?: string; limit?: number; offset?: number }) => Promise<IndexInventory>;
             listFiles: (limit?: number, offset?: number) => Promise<FileListResponse>;
-            getFile: (fileId: string) => Promise<import('./types').FileRecord | null>;
+            getFile: (fileId: string) => Promise<FileListResponse['files'][0] | null>;
             getChunk: (chunkId: string) => Promise<ChunkSnapshot | null>;
             listFileChunks: (fileId: string) => Promise<ChunkSnapshot[]>;
             getChunkHighlight?: (chunkId: string, zoom?: number) => Promise<string>;
@@ -74,48 +58,6 @@ declare global {
                 onDone: () => void;
             }, searchMode?: 'auto' | 'knowledge' | 'direct', resumeToken?: string, useVisionForAnswer?: boolean) => () => void;
             health: () => Promise<HealthStatus>;
-            listEmailAccounts: () => Promise<EmailAccountSummary[]>;
-            addEmailAccount: (payload: EmailAccountPayload) => Promise<EmailAccountSummary>;
-            removeEmailAccount: (accountId: string) => Promise<{ id: string }>;
-            syncEmailAccount: (accountId: string, limit?: number) => Promise<EmailSyncResult>;
-            listEmailMessages: (accountId: string, limit?: number) => Promise<EmailMessageSummary[]>;
-            getEmailMessage: (messageId: string) => Promise<EmailMessageContent>;
-            // Account-Level Email Memory API (memory-v2.5)
-            buildAccountMemory: (accountId: string, userId?: string) => Promise<BuildAccountMemoryResult>;
-            getAccountMemoryStatus: (accountId: string, userId?: string) => Promise<AccountMemoryStatus>;
-            getAccountMemoryDetails: (accountId: string, userId?: string, limit?: number) => Promise<AccountMemoryDetails>;
-            accountQA: (accountId: string, question: string, userId?: string) => Promise<AccountQAResult>;
-            listNotes: () => Promise<NoteSummary[]>;
-            createNote: (payload: NoteDraftPayload) => Promise<NoteSummary>;
-            getNote: (noteId: string) => Promise<NoteContent>;
-            updateNote: (noteId: string, payload: NoteDraftPayload) => Promise<NoteContent>;
-            deleteNote: (noteId: string) => Promise<{ id: string }>;
-            showSpotlightWindow: () => Promise<unknown>;
-            toggleSpotlightWindow: () => Promise<unknown>;
-            hideSpotlightWindow: () => void;
-            spotlightFocusFile: (fileId: string) => void;
-            spotlightOpenFile: (fileId: string) => void;
-            onSpotlightFocusFile: (callback: (payload: { fileId: string }) => void) => () => void;
-            onSpotlightOpenFile: (callback: (payload: { fileId: string }) => void) => () => void;
-            onSpotlightTabSwitch: (callback: (payload: { tab: 'search' | 'notes' }) => void) => () => void;
-            notifyNotesChanged: () => void;
-            onNotesChanged: (callback: () => void) => () => void;
-            modelStatus: () => Promise<ModelStatusSummary>;
-            downloadModels: () => Promise<ModelStatusSummary>;
-            redownloadModel: (assetId: string) => Promise<ModelStatusSummary>;
-            getModelConfig: () => Promise<any>;
-            setModelConfig: (config: any) => Promise<any>;
-            addModel: (descriptor: any) => Promise<any>;
-            pickFile: (options?: { filters?: { name: string; extensions: string[] }[] }) => Promise<string | null>;
-            pickFiles?: (options?: { filters?: { name: string; extensions: string[] }[] }) => Promise<string[]>;
-            benchmarkListResultFolders?: () => Promise<string[]>;
-            benchmarkListResultFiles?: (folder: string) => Promise<string[]>;
-            benchmarkReadResultFile?: (folder: string, file: string) => Promise<string>;
-            onModelDownloadEvent?: (callback: (event: ModelDownloadEvent) => void) => () => void;
-            ingestScreenshot?: (image: Uint8Array) => Promise<ActivityLog>;
-            getActivityTimeline?: (start?: string, end?: string, summary?: boolean) => Promise<ActivityTimelineResponse>;
-            deleteActivityLog?: (logId: string) => Promise<void>;
-            captureScreen?: () => Promise<Uint8Array>;
             readImage: (filePath: string) => Promise<string>;
             listChatSessions: (limit?: number, offset?: number) => Promise<ChatSession[]>;
             createChatSession: (title?: string) => Promise<ChatSession>;
@@ -125,7 +67,7 @@ declare global {
             addChatMessage: (sessionId: string, message: Partial<ConversationMessage>) => Promise<ConversationMessage>;
             exportLogs: () => Promise<{ exported: boolean; path: string | null; error?: string }>;
             getLogsPath: () => Promise<string>;
-// User Memory APIs
+            // User Memory APIs
             memoryGetSummary?: (userId: string) => Promise<{
                 user_id: string;
                 profile?: {
@@ -198,7 +140,7 @@ declare global {
                 serverPath: string | null;
             }>;
             mcpCopyConfig: () => Promise<string>;
-            
+
             // MCP Connection Management APIs
             mcpListConnections: () => Promise<{
                 name: string;
@@ -231,20 +173,20 @@ declare global {
             // ========================================
             // Privacy APIs
             // ========================================
-            
+
             // Update file privacy level (normal | private)
             setFilePrivacy: (fileId: string, privacyLevel: 'normal' | 'private') => Promise<{
                 fileId: string;
                 privacyLevel: 'normal' | 'private';
                 updated: boolean;
             }>;
-            
+
             // Get file privacy level
             getFilePrivacy: (fileId: string) => Promise<{
                 fileId: string;
                 privacyLevel: 'normal' | 'private';
             }>;
-            
+
             // Update folder privacy level (with option to apply to all files)
             setFolderPrivacy: (folderId: string, privacyLevel: 'normal' | 'private', applyToFiles?: boolean) => Promise<{
                 folderId: string;
@@ -252,7 +194,7 @@ declare global {
                 updated: boolean;
                 filesUpdated: number;
             }>;
-            
+
             // Get folder privacy level and file counts
             getFolderPrivacy: (folderId: string) => Promise<{
                 folderId: string;
@@ -260,6 +202,7 @@ declare global {
                 filesNormal: number;
                 filesPrivate: number;
             }>;
+            pluginInvoke: (pluginId: string, method: string, ...args: any[]) => Promise<any>;
         };
     }
 }

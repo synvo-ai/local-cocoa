@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw, PlugZap } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '@/renderer/lib/utils';
+import { API_PREFIX } from '../config';
 
 const API_BASE = 'http://127.0.0.1:8890';
 
@@ -128,7 +129,7 @@ export function OpenClawPanel() {
         setLoading(true);
         setError(null);
         try {
-            const data = await fetchJson<TelegramStatus>(key, '/plugins/synvo_ai_openclaw/telegram/status');
+            const data = await fetchJson<TelegramStatus>(key, `${API_PREFIX}/telegram/status`);
             setStatus(data);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load status.');
@@ -143,7 +144,7 @@ export function OpenClawPanel() {
         try {
             const data = await fetchJson<{ messages: TelegramMessage[] }>(
                 key,
-                '/plugins/synvo_ai_openclaw/telegram/messages?limit=100'
+                `${API_PREFIX}/telegram/messages?limit=100`
             );
             setMessages(data.messages ?? []);
         } catch (err) {
@@ -189,7 +190,7 @@ export function OpenClawPanel() {
         setActionBusy(true);
         setError(null);
         try {
-            await fetchJson<ActionResult>(localKey, '/plugins/synvo_ai_openclaw/telegram/restart', { method: 'POST' });
+            await fetchJson<ActionResult>(localKey, `${API_PREFIX}/telegram/restart`, { method: 'POST' });
             await loadStatus();
             await loadMessages();
         } catch (err) {
@@ -206,7 +207,7 @@ export function OpenClawPanel() {
         try {
             const data = await fetchJson<{ ok: boolean; status: TelegramStatus }>(
                 localKey,
-                '/plugins/synvo_ai_openclaw/telegram/token',
+                `${API_PREFIX}/telegram/token`,
                 {
                     method: 'POST',
                     body: JSON.stringify({ token: botTokenInput.trim() }),
@@ -230,7 +231,7 @@ export function OpenClawPanel() {
         try {
             const data = await fetchJson<{ ok: boolean; status: TelegramStatus }>(
                 localKey,
-                '/plugins/synvo_ai_openclaw/telegram/token',
+                `${API_PREFIX}/telegram/token`,
                 {
                     method: 'POST',
                     body: JSON.stringify({ token: '' }),

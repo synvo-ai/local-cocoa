@@ -1,8 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageCircleQuestion, Send, Loader2, Mail, ChevronDown, AlertCircle, Sparkles, Brain, Database, FileText, Calendar, RefreshCw, CheckCircle2, XCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { cn } from '@/lib/utils';
-import type { EmailAccountSummary, AccountQAResult, AccountMemoryStatus, AccountMemoryDetails } from '@/types';
+import { cn } from '@/renderer/lib/utils';
+import { API_PREFIX } from '../config';
+
+import type { EmailAccountSummary, AccountQAResult, AccountMemoryStatus, AccountMemoryDetails } from '../types';
+import { mailAPI } from './api';
+
+const API_BASE = 'http://127.0.0.1:8890';
 
 interface EmailQAPageProps {
     accounts: EmailAccountSummary[];
@@ -119,7 +124,7 @@ export function EmailQAPage({ accounts }: EmailQAPageProps) {
             if (!apiKey) return;
 
             const response = await fetch(
-                `http://127.0.0.1:8890/plugins/synvo_ai_mail/accounts/${encodeURIComponent(accountId)}/failed-emails`,
+                `${API_BASE}${API_PREFIX}/accounts/${encodeURIComponent(accountId)}/failed-emails`,
                 {
                     headers: {
                         'X-API-Key': apiKey,
@@ -157,14 +162,14 @@ export function EmailQAPage({ accounts }: EmailQAPageProps) {
         const fetchStatus = async () => {
             setLoadingStatus(true);
             try {
-                const status = await window.api.getAccountMemoryStatus(selectedAccountId);
+                const status = await mailAPI.getAccountMemoryStatus(selectedAccountId);
                 setMemoryStatus(status);
 
                 // Fetch detailed memory items if memory is built
                 if (status?.isBuilt) {
                     setLoadingDetails(true);
                     try {
-                        const details = await window.api.getAccountMemoryDetails(selectedAccountId);
+                        const details = await mailAPI.getAccountMemoryDetails(selectedAccountId);
                         console.log('[EmailQAPage] Memory details received:', {
                             accountId: details?.accountId,
                             memcells: details?.memcells?.length ?? 0,
@@ -222,7 +227,7 @@ export function EmailQAPage({ accounts }: EmailQAPageProps) {
             }
 
             const response = await fetch(
-                `http://127.0.0.1:8890/plugins/synvo_ai_mail/accounts/${encodeURIComponent(selectedAccountId)}/retry-email/${encodeURIComponent(messageId)}`,
+                `${API_BASE}${API_PREFIX}/accounts/${encodeURIComponent(selectedAccountId)}/retry-email/${encodeURIComponent(messageId)}`,
                 {
                     method: 'POST',
                     headers: {
@@ -266,10 +271,10 @@ export function EmailQAPage({ accounts }: EmailQAPageProps) {
                                 // Remove from failed list on success
                                 setFailedEmails(prev => prev.filter(e => e.id !== messageId));
                                 // Refresh memory status
-                                const status = await window.api.getAccountMemoryStatus(selectedAccountId);
+                                const status = await mailAPI.getAccountMemoryStatus(selectedAccountId);
                                 setMemoryStatus(status);
                                 if (status?.isBuilt) {
-                                    const details = await window.api.getAccountMemoryDetails(selectedAccountId);
+                                    const details = await mailAPI.getAccountMemoryDetails(selectedAccountId);
                                     setMemoryDetails(details);
                                 }
                             } else if (data.type === 'error') {
@@ -329,7 +334,7 @@ export function EmailQAPage({ accounts }: EmailQAPageProps) {
             }
 
             // Use fetch with streaming to call the SSE endpoint
-            const response = await fetch(`http://127.0.0.1:8890/plugins/synvo_ai_mail/accounts/${encodeURIComponent(selectedAccountId)}/build-memory/stream`, {
+            const response = await fetch(`${API_BASE}${API_PREFIX}/accounts/${encodeURIComponent(selectedAccountId)}/build-memory/stream`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -413,13 +418,13 @@ export function EmailQAPage({ accounts }: EmailQAPageProps) {
             }
 
             // Refresh status, details, and failed emails after building
-            const status = await window.api.getAccountMemoryStatus(selectedAccountId);
+            const status = await mailAPI.getAccountMemoryStatus(selectedAccountId);
             setMemoryStatus(status);
 
             // Fetch updated memory details
             if (status?.isBuilt) {
                 try {
-                    const details = await window.api.getAccountMemoryDetails(selectedAccountId);
+                    const details = await mailAPI.getAccountMemoryDetails(selectedAccountId);
                     setMemoryDetails(details);
                 } catch (error) {
                     console.error('Failed to fetch memory details:', error);
@@ -454,7 +459,7 @@ export function EmailQAPage({ accounts }: EmailQAPageProps) {
         setLoading(true);
 
         try {
-            const result = await window.api.accountQA(selectedAccountId, userMessage.content);
+            const result = await mailAPI.accountQA(selectedAccountId, userMessage.content);
 
             const assistantMessage: Message = {
                 id: `assistant-${Date.now()}`,

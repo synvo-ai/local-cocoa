@@ -4,8 +4,8 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { registerPluginDataHandler, unregisterPluginDataHandler } from '@/hooks/usePluginData';
-import type { IndexingItem, FolderRecord } from '@/types';
+import { registerPluginDataHandler, unregisterPluginDataHandler } from '@/renderer/hooks/usePluginData';
+import type { IndexingItem, FolderRecord } from '@/renderer/types';
 
 const PLUGIN_ID = 'notes';
 
@@ -29,24 +29,24 @@ export function useNotesPluginData() {
         try {
             // Fetch folders to find notes folder
             const folders = await api.listFolders();
-            const foundNotesFolder = folders.find((folder: FolderRecord) => 
+            const foundNotesFolder = folders.find((folder: FolderRecord) =>
                 normalisePath(folder.path).includes('/.synvo_db/notes')
             );
             setNoteFolderId(foundNotesFolder ? foundNotesFolder.id : null);
 
             // Fetch indexing status
             const inventory = await api.indexInventory({});
-            
+
             // Filter indexing items for notes folder
             const notesFolderIds = new Set(
                 folders
-                    .filter((folder: FolderRecord) => 
+                    .filter((folder: FolderRecord) =>
                         normalisePath(folder.path).includes('/.synvo_db/notes')
                     )
                     .map((folder: FolderRecord) => folder.id)
             );
 
-            const noteIndexing = inventory.indexing.filter((item: IndexingItem) => 
+            const noteIndexing = inventory.indexing.filter((item: IndexingItem) =>
                 notesFolderIds.has(item.folderId)
             );
 

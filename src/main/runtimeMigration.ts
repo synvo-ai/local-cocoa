@@ -36,8 +36,6 @@ const DATA_DIRS = [
 
 // Subdirectories within synvo_db that should exist
 const SYNVO_DB_SUBDIRS = [
-    'notes',
-    'mail',
     'qdrant-data',
 ];
 

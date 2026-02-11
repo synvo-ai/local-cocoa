@@ -4,8 +4,9 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { registerPluginDataHandler, unregisterPluginDataHandler } from '@/hooks/usePluginData';
-import type { EmailAccountSummary, IndexingItem } from '@/types';
+import { registerPluginDataHandler, unregisterPluginDataHandler } from '@/renderer/hooks/usePluginData';
+import type { EmailAccountSummary } from '../types';
+import type { IndexingItem } from '@/renderer/types';
 
 const PLUGIN_ID = 'mail';
 
@@ -29,7 +30,7 @@ export function useEmailPluginData() {
 
             // Fetch indexing status for each account
             const inventory = await api.indexInventory({});
-            
+
             // Build account folder map
             const accountFolderMap = new Map<string, string>();
             accounts.forEach((account: EmailAccountSummary) => {

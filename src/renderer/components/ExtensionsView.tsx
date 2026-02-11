@@ -85,8 +85,7 @@ export function ExtensionsView({
     const {
         isIndexing,
         refreshData,
-        emailAccounts,
-        emailIndexingByAccount,
+        files: indexedFiles
     } = useWorkspaceData();
 
     // Activity tracking state
@@ -199,9 +198,7 @@ export function ExtensionsView({
                                 refreshData={refreshData}
                                 isActivityTracking={isActivityTracking}
                                 onToggleActivityTracking={handleToggleActivityTracking}
-                                // Pass extra workspace data that plugins might need
-                                emailAccounts={emailAccounts}
-                                emailIndexingByAccount={emailIndexingByAccount}
+                                indexedFiles={indexedFiles}
                             />
                         </div>
                     </Suspense>
@@ -232,8 +229,6 @@ export function ExtensionsView({
         loadPluginComponent,
         isIndexing,
         refreshData,
-        emailAccounts,
-        emailIndexingByAccount,
         isActivityTracking,
         handleToggleActivityTracking,
     ]);
