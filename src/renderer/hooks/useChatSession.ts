@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import type { ChatSession, ConversationMessage, SearchHit, ThinkingStep, ThinkingStepHit } from '../types';
+import type { ChatSession, ConversationMessage, SearchHit, ThinkingStep, ThinkingStepHit, ToolCallInfo } from '../types';
 import { useModelConfig } from './useModelConfig';
 import type { SearchMode } from '../components/ConversationPanel';
 
@@ -13,8 +13,60 @@ interface AgentContextState {
 
 const LOCAL_MODEL_LABEL = 'local-llm';
 
+function parseToolResult(result?: string): Record<string, unknown> | null {
+    if (!result) return null;
+    try {
+        const parsed = JSON.parse(result);
+        return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
+    } catch {
+        return null;
+    }
+}
+
+function asCsvText(value: unknown): string {
+    if (Array.isArray(value)) {
+        return value.map(item => String(item).trim()).filter(Boolean).join(', ');
+    }
+    return String(value ?? '').trim();
+}
+
+function buildToolOutcomeText(
+    toolCall: ToolCallInfo,
+    status: 'confirmed' | 'cancelled',
+    result?: string,
+    updatedArgs?: Record<string, unknown>
+): string {
+    const mergedArgs = updatedArgs ? { ...toolCall.args, ...updatedArgs } : toolCall.args;
+
+    if (toolCall.tool === 'send_email') {
+        if (status === 'cancelled') {
+            return 'Email send cancelled.';
+        }
+
+        const parsed = parseToolResult(result);
+        const recipients = asCsvText(parsed?.to ?? mergedArgs.to);
+        const subject = String(mergedArgs.subject ?? '').trim();
+
+        if (recipients && subject) {
+            return `Sent email to ${recipients} with subject "${subject}".`;
+        }
+        if (recipients) {
+            return `Sent email to ${recipients}.`;
+        }
+        return 'Email sent successfully.';
+    }
+
+    if (toolCall.tool === 'create_note') {
+        return status === 'cancelled' ? 'Note creation cancelled.' : 'Note created successfully.';
+    }
+
+    return status === 'cancelled'
+        ? `${toolCall.tool} cancelled.`
+        : `${toolCall.tool} executed successfully.`;
+}
+
 export function useChatSession() {
-    const { config } = useModelConfig();
+    useModelConfig();
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [agentContext, setAgentContext] = useState<AgentContextState | null>(null);
@@ -386,6 +438,11 @@ Title:`;
             let needsUserDecision = false;
             let resumeToken: string | null = null;
             let decisionMessage: string | undefined;
+            let currentToolCalls: ToolCallInfo[] = [];
+
+            // Get session history
+            const activeSession = sessions.find(s => s.id === targetSessionId);
+            const history = activeSession ? activeSession.messages.map(m => ({ role: m.role, content: m.text })) : [];
 
             // Let backend use its own qa_context_limit setting
             api.askStream(text, undefined, 'qa', {
@@ -484,6 +541,7 @@ Title:`;
                                     'decomposing_query': 'Decomposing query...',
                                     'merging_results': 'Merging results...',
                                     'synthesizing_answer': 'Synthesizing answer...',
+                                    'agent_starting': 'Agent is thinking...',
                                 };
                                 // Handle dynamic status patterns
                                 let statusText = statusMessages[payload.data] || payload.data;
@@ -854,6 +912,58 @@ Title:`;
                                         }
                                     });
                                 }
+                            } else if (payload.type === 'tool_call') {
+                                // Agent mode: tool invocation
+                                const tc: ToolCallInfo = {
+                                    callId: payload.data.call_id,
+                                    tool: payload.data.tool,
+                                    args: payload.data.args,
+                                };
+                                currentToolCalls = [...currentToolCalls, tc];
+                                updateMessage({ toolCalls: [...currentToolCalls] });
+                            } else if (payload.type === 'tool_result') {
+                                // Agent mode: tool result — check for pending confirmation
+                                let confirmationId: string | undefined;
+                                let confirmStatus: 'pending' | undefined;
+                                let confirmationMessage: string | undefined;
+
+                                if (payload.data.requires_confirmation && payload.data.confirmation_id) {
+                                    confirmationId = payload.data.confirmation_id;
+                                    confirmStatus = 'pending';
+                                    confirmationMessage = payload.data.confirmation_message;
+                                    decisionMessage = confirmationMessage;
+                                    needsUserDecision = true;
+                                }
+
+                                try {
+                                    const parsed = JSON.parse(payload.data.output_preview || '{}');
+                                    if (!confirmationId && parsed.status === 'pending_confirmation' && parsed.confirmation_id) {
+                                        confirmationId = parsed.confirmation_id;
+                                        confirmStatus = 'pending';
+                                        confirmationMessage = parsed.message;
+                                        decisionMessage = confirmationMessage;
+                                        needsUserDecision = true;
+                                    }
+                                } catch { /* not JSON, fine */ }
+
+                                currentToolCalls = currentToolCalls.map(tc =>
+                                    tc.callId === payload.data.call_id
+                                        ? {
+                                            ...tc,
+                                            result: payload.data.output_preview,
+                                            success: payload.data.success,
+                                            ...(confirmationId ? { confirmationId, confirmStatus } : {}),
+                                        }
+                                        : tc
+                                );
+                                updateMessage({ 
+                                    toolCalls: [...currentToolCalls],
+                                    ...(needsUserDecision ? {
+                                        needsUserDecision,
+                                        decisionMessage: confirmationMessage,
+                                        meta: 'Waiting for confirmation...'
+                                    } : {})
+                                });
                             } else if (payload.type === 'token') {
                                 currentAnswer += payload.data;
                                 updateMessage({ text: currentAnswer });
@@ -874,6 +984,13 @@ Title:`;
                                     ...(isMultiPath ? {
                                         isMultiPath: true,
                                         thinkingSteps: [...currentThinkingSteps]
+                                    } : {}),
+                                    ...(currentToolCalls.length > 0 ? {
+                                        toolCalls: [...currentToolCalls]
+                                    } : {}),
+                                    ...(needsUserDecision ? {
+                                        needsUserDecision,
+                                        decisionMessage,
                                     } : {})
                                 });
                                 currentMeta = undefined;
@@ -927,22 +1044,36 @@ Title:`;
                                 isMultiPath: isMultiPath,
                                 thinkingSteps: [...currentThinkingSteps]
                             } : {}),
+                            ...(currentToolCalls.length > 0 ? {
+                                toolCalls: [...currentToolCalls]
+                            } : {}),
                             ...(needsUserDecision ? {
                                 needsUserDecision,
                                 resumeToken,
                                 decisionMessage
                             } : {})
                         };
-                        void api.addChatMessage(targetSessionId, finalMsg).catch(e => console.error('Failed to persist final message', e));
+                        void api.addChatMessage(targetSessionId, finalMsg)
+                            .then(saved => {
+                                setSessions(prev => prev.map(s => {
+                                    if (s.id !== targetSessionId) return s;
+                                    const messages = [...s.messages];
+                                    const idx = messages.findIndex(m => m.timestamp === placeholderTimestamp && m.role === 'assistant' && !m.id);
+                                    if (idx < 0) return s;
+                                    messages[idx] = { ...messages[idx], id: saved.id };
+                                    return { ...s, messages };
+                                }));
+                            })
+                            .catch(e => console.error('Failed to persist final message', e));
                     }
 
                     if (shouldGenerateTitle) {
                         void generateTitle(targetSessionId!, text, currentAnswer);
                     }
                 }
-            }, searchMode, undefined, useVisionForAnswer);
+            }, searchMode, undefined, useVisionForAnswer, history);
         },
-        [currentSessionId, generateTitle, sessions, config]
+        [currentSessionId, generateTitle, sessions]
     );
 
     const handleResume = useCallback(
@@ -1020,6 +1151,8 @@ Title:`;
                     }
                 }));
             };
+
+            const history = session.messages.map(m => ({ role: m.role, content: m.text }));
 
             // Let backend use its own qa_context_limit setting
             api.askStream(text, undefined, 'qa', {
@@ -1269,21 +1402,80 @@ Title:`;
                             references: currentHits,
                             meta: undefined,
                             ...(isMultiPath ? { isMultiPath: true, thinkingSteps: [...currentThinkingSteps] } : {}),
+                            ...(currentToolCalls.length > 0 ? { toolCalls: [...currentToolCalls] } : {}),
                             ...(needsUserDecision ? { needsUserDecision, resumeToken: nextResumeToken, decisionMessage } : {})
                         };
-                        void api.addChatMessage(sessionId, finalMsg).catch(e => console.error('Failed to persist final message', e));
+                        void api.addChatMessage(sessionId, finalMsg)
+                            .then(saved => {
+                                setSessions(prev => prev.map(s => {
+                                    if (s.id !== sessionId) return s;
+                                    const messages = [...s.messages];
+                                    const idx = messages.findIndex(m => m.timestamp === lastMsg.timestamp && m.role === 'assistant' && !m.id);
+                                    if (idx < 0) return s;
+                                    messages[idx] = { ...messages[idx], id: saved.id };
+                                    return { ...s, messages };
+                                }));
+                            })
+                            .catch(e => console.error('Failed to persist final message', e));
                     }
                 }
-            }, searchMode, token);
-        },
-        [sessions, config, agentContext]
-    );
+                }, searchMode, token, undefined, history);
+            },
+            [sessions, agentContext]
+        );
 
-    return {
-        sessions,
-        currentSessionId,
-        currentSession,
-        messages,
+        const updateToolCallStatus = useCallback(
+            (
+                messageIndex: number,
+                callId: string,
+                status: 'confirmed' | 'cancelled',
+                result?: string,
+                updatedArgs?: Record<string, unknown>
+            ) => {
+                setSessions(prev => prev.map(s => {
+                    if (s.id !== currentSessionId) return s;
+                    const msgs = [...s.messages];
+                    const msg = msgs[messageIndex];
+                    if (!msg?.toolCalls) return s;
+                    const targetToolCall = msg.toolCalls.find(tc => tc.callId === callId);
+                    const nextText = targetToolCall
+                        ? buildToolOutcomeText(targetToolCall, status, result, updatedArgs)
+                        : msg.text;
+                    msgs[messageIndex] = {
+                        ...msg,
+                        text: nextText,
+                        needsUserDecision: false,
+                        resumeToken: undefined,
+                        decisionMessage: undefined,
+                        meta: status === 'confirmed' ? 'Executed' : 'Cancelled',
+                        toolCalls: msg.toolCalls.map(tc =>
+                            tc.callId === callId
+                                ? {
+                                    ...tc,
+                                    args: updatedArgs ? { ...tc.args, ...updatedArgs } : tc.args,
+                                    confirmStatus: status,
+                                    confirmResult: result,
+                                }
+                                : tc
+                        )
+                    };
+                    
+                    // Persist state in background
+                    if (window.api.updateChatMessage && msg.id) {
+                        void window.api.updateChatMessage(s.id, msg.id, msgs[messageIndex]).catch(e => console.error('Failed to update tool call status', e));
+                    }
+                    
+                    return { ...s, messages: msgs };
+                }));
+            },
+            [currentSessionId]
+        );
+
+        return {
+            sessions,
+            currentSessionId,
+            currentSession,
+            messages,
         agentContext,
         isAnswering,
         handleCreateSession,
@@ -1292,6 +1484,7 @@ Title:`;
         handleResetConversation,
         handleSend,
         handleResume,
+        updateToolCallStatus,
         setSessions,
         setCurrentSessionId,
         setAgentContext,

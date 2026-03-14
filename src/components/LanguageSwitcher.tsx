@@ -30,31 +30,24 @@ export function LanguageSwitcher() {
     };
 
     return (
-        <div className="grid grid-cols-4 gap-3">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '0.75rem' }}>
             {(Object.entries(SUPPORTED_LANGUAGES) as [SupportedLanguage, string][]).map(([code, name]) => (
                 <button
                     key={code}
                     onClick={() => changeLanguage(code)}
-                    className={`relative flex flex-col items-center justify-center gap-2 rounded-xl border p-4 transition-all hover:shadow-md ${
+                    className={`relative flex flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2.5 transition-all hover:shadow-sm ${
                         currentLanguage === code
-                            ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
                             : 'bg-card hover:bg-accent/50'
                     }`}
                 >
-                    {/* Selection indicator */}
                     {currentLanguage === code && (
-                        <div className="absolute top-2 right-2">
-                            <Check className="h-4 w-4 text-primary" />
-                        </div>
+                        <Check className="absolute top-1.5 right-1.5 h-3 w-3 text-primary" />
                     )}
-                    
-                    {/* Flag */}
-                    <span className="text-3xl" role="img" aria-label={name}>
+                    <span className="text-xl" role="img" aria-label={name}>
                         {LANGUAGE_FLAGS[code]}
                     </span>
-                    
-                    {/* Language name */}
-                    <span className={`text-xs font-medium text-center ${
+                    <span className={`text-[11px] font-medium ${
                         currentLanguage === code ? 'text-primary' : 'text-muted-foreground'
                     }`}>
                         {name}

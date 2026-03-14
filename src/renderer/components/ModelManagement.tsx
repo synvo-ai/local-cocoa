@@ -443,8 +443,6 @@ export function ModelManagement() {
                 </div>
 
 
-
-
                 {/* Embedding Model Selection */}
                 {embeddingModels.length > 1 && (
                     <div className="space-y-4">

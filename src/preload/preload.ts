@@ -208,6 +208,13 @@ const api = {
     applyPreset: (presetId: string): Promise<void> => ipcRenderer.invoke('models:apply-preset', presetId),
     downloadSelectedModels: (): Promise<any> => ipcRenderer.invoke('models:download-selected'),
     addModel: (descriptor: any): Promise<any> => ipcRenderer.invoke('models:add', descriptor),
+
+    // Provider configuration (local ↔ remote switching)
+    getProviderConfig: (): Promise<any> => ipcRenderer.invoke('providers:get-config'),
+    updateProviderConfig: (patch: any): Promise<any> => ipcRenderer.invoke('providers:update-config', patch),
+    testProviderConnection: (params: { base_url: string; api_key?: string; model?: string; provider_hint?: string }): Promise<any> =>
+        ipcRenderer.invoke('providers:test-connection', params),
+
     pickFile: (options?: { filters?: { name: string; extensions: string[] }[] }): Promise<string | null> =>
         ipcRenderer.invoke('files:pick-one', options),
     pickFiles: (options?: { filters?: { name: string; extensions: string[] }[] }): Promise<string[]> =>
@@ -229,7 +236,7 @@ const api = {
         onData: (chunk: string) => void;
         onError: (error: string) => void;
         onDone: () => void;
-    }, searchMode?: 'auto' | 'knowledge' | 'direct', resumeToken?: string, useVisionForAnswer?: boolean): () => void => {
+    }, searchMode?: 'auto' | 'knowledge' | 'direct' | 'agent', resumeToken?: string, useVisionForAnswer?: boolean, conversationHistory?: any[]): () => void => {
         const dataChannel = 'qa:stream-data';
         const errorChannel = 'qa:stream-error';
         const doneChannel = 'qa:stream-done';
@@ -242,7 +249,7 @@ const api = {
         ipcRenderer.on(errorChannel, onError);
         ipcRenderer.on(doneChannel, onDone);
 
-        ipcRenderer.send('qa:ask-stream', { query, limit, mode, searchMode, resumeToken, useVisionForAnswer });
+        ipcRenderer.send('qa:ask-stream', { query, limit, mode, searchMode, resumeToken, useVisionForAnswer, conversationHistory });
 
         return () => {
             ipcRenderer.removeListener(dataChannel, onData);
@@ -263,6 +270,14 @@ const api = {
         ipcRenderer.invoke('chat:update', { sessionId, title }),
     addChatMessage: (sessionId: string, message: Partial<ConversationMessage>): Promise<ConversationMessage> =>
         ipcRenderer.invoke('chat:add-message', { sessionId, message }),
+    updateChatMessage: (sessionId: string, messageId: string, message: Partial<ConversationMessage>): Promise<ConversationMessage> =>
+        ipcRenderer.invoke('chat:update-message', { sessionId, messageId, message }),
+    confirmAgentTool: (confirmationId: string, overrides?: Record<string, unknown>): Promise<{ status: string; tool: string; result: string }> =>
+        ipcRenderer.invoke('agent:confirm-tool', { confirmationId, overrides }),
+    cancelAgentTool: (confirmationId: string): Promise<{ status: string; tool: string }> =>
+        ipcRenderer.invoke('agent:cancel-tool', { confirmationId }),
+    listEmailAccounts: (): Promise<import('../types/files').EmailAccountOption[]> =>
+        ipcRenderer.invoke('agent:list-email-accounts'),
 
     // ========================================
     // Enhanced File System Scan APIs

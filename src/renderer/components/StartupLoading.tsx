@@ -1,14 +1,15 @@
-import { Loader2, Settings, Download, Sparkles, Coffee } from 'lucide-react';
+import { Loader2, Settings, Download, Sparkles, Coffee, ArrowRight } from 'lucide-react';
 import logo from '../assets/local_cocoa_logo_full.png';
 import { useEffect } from 'react';
 
 interface StartupLoadingProps {
     onOpenModelManager: () => void;
+    onSkipSetup?: () => void;
     statusMessage?: string;
     modelsReady: boolean;
 }
 
-export function StartupLoading({ onOpenModelManager, statusMessage, modelsReady }: StartupLoadingProps) {
+export function StartupLoading({ onOpenModelManager, onSkipSetup, statusMessage, modelsReady }: StartupLoadingProps) {
     // Auto-open model manager if models are missing after a short delay
     useEffect(() => {
         if (!modelsReady) {
@@ -68,8 +69,17 @@ export function StartupLoading({ onOpenModelManager, statusMessage, modelsReady 
                                 className="mt-2 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
                             >
                                 <Download className="h-4 w-4" />
-                                Complete AI Setup
+                                Download AI Models
                             </button>
+                            {onSkipSetup && (
+                                <button
+                                    onClick={onSkipSetup}
+                                    className="mt-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                                >
+                                    <span>Skip — I&apos;ll use external endpoints</span>
+                                    <ArrowRight className="h-3.5 w-3.5" />
+                                </button>
+                            )}
                         </div>
                     ) : (
                         <>

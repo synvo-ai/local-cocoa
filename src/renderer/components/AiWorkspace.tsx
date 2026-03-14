@@ -148,6 +148,7 @@ export function AiWorkspace({
                     onPreviewReference={(reference) => setPreviewReference(reference)}
                     agentContext={agentContext}
                     onResetConversation={onResetConversation}
+                    currentSessionId={currentSessionId}
                 />
                 {previewFile ? (
                     <div className="absolute right-4 top-4 w-80 rounded-xl border border-white/10 bg-slate-900 p-4 shadow-2xl">

@@ -37,7 +37,11 @@ export function registerHandlers() {
     });
 
     ipcMain.handle(`plugin:${PLUGIN_ID}:outlook:complete`, async (_event, payload: { flowId: string; label: string }) => {
-        return completeOutlookSetup(payload.flowId, payload.label);
+        try {
+            return await completeOutlookSetup(payload.flowId, payload.label);
+        } catch (e: any) {
+            throw new Error(e?.message || String(e) || 'Failed to complete Outlook setup');
+        }
     });
 
     ipcMain.handle(`plugin:${PLUGIN_ID}:remove`, async (_event, accountId: string) => {

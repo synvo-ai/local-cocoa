@@ -18,6 +18,7 @@ interface ChatAreaProps {
     title?: string;
     files?: IndexedFile[];
     onResume?: (mode?: SearchMode) => Promise<void>;
+    onUpdateToolCallStatus?: (messageIndex: number, callId: string, status: 'confirmed' | 'cancelled', result?: string) => void;
 }
 
 export function ChatArea({
@@ -34,7 +35,9 @@ export function ChatArea({
     onResetConversation,
     title,
     files,
-    onResume
+    onResume,
+    onUpdateToolCallStatus,
+    currentSessionId
 }: ChatAreaProps) {
     // We don't need internal preview state anymore as it's handled by the parent layout
     // But ConversationPanel expects onPreviewReference.
@@ -60,6 +63,8 @@ export function ChatArea({
                 agentContext={agentContext}
                 files={files}
                 onResume={onResume}
+                onUpdateToolCallStatus={onUpdateToolCallStatus}
+                currentSessionId={currentSessionId}
             />
         </div>
     );

@@ -24,6 +24,7 @@ import type {
 
 const LOCAL_MODEL_LABEL = 'local-llm';
 const ONBOARDING_KEY = 'local-cocoa-onboarding-completed';
+const SETUP_SKIPPED_KEY = 'local-cocoa-setup-skipped';
 
 function isConnectorPath(pathValue: string | null | undefined): boolean {
     const normalised = (pathValue ?? '').replace(/\\/g, '/').toLowerCase();
@@ -40,6 +41,9 @@ export function MainAppView() {
     const [isModelModalOpen, setIsModelModalOpen] = useState(false);
     const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
         return !localStorage.getItem(ONBOARDING_KEY);
+    });
+    const [setupSkipped, setSetupSkipped] = useState(() => {
+        return Boolean(localStorage.getItem(SETUP_SKIPPED_KEY));
     });
     const [selectedFile, setSelectedFile] = useState<IndexedFile | null>(null);
     const [selectedHit, setSelectedHit] = useState<SearchHit | null>(null);
@@ -70,6 +74,12 @@ export function MainAppView() {
     const handleOnboardingComplete = useCallback(() => {
         localStorage.setItem(ONBOARDING_KEY, 'true');
         setIsOnboardingOpen(false);
+    }, []);
+
+    const handleSkipSetup = useCallback(() => {
+        localStorage.setItem(SETUP_SKIPPED_KEY, 'true');
+        setSetupSkipped(true);
+        setIsModelModalOpen(false);
     }, []);
 
     const handleOpenGuide = useCallback(() => {
@@ -301,7 +311,8 @@ export function MainAppView() {
         handleSelectSession,
         handleResetConversation,
         handleSend,
-        handleResume
+        handleResume,
+        updateToolCallStatus
     } = useChatSession();
 
     const handleResumeSearch = useCallback(async (mode?: any) => {
@@ -538,9 +549,10 @@ export function MainAppView() {
 
     return (
         <>
-            {(!isBackendReady || !modelsReady) ? (
+            {(!isBackendReady || (!modelsReady && !setupSkipped)) ? (
                 <StartupLoading
                     onOpenModelManager={() => setIsModelModalOpen(true)}
+                    onSkipSetup={handleSkipSetup}
                     statusMessage={statusMessage}
                     modelsReady={modelsReady}
                 />
@@ -631,6 +643,7 @@ export function MainAppView() {
                             title={currentSession?.title}
                             files={visibleFiles}
                             onResume={handleResumeSearch}
+                            onUpdateToolCallStatus={updateToolCallStatus}
                         />
                     )}
                     {activeView === 'knowledge' && (
@@ -700,6 +713,7 @@ export function MainAppView() {
             <ModelManagerModal
                 isOpen={isModelModalOpen && !isOnboardingOpen}
                 onClose={() => setIsModelModalOpen(false)}
+                onSkipSetup={handleSkipSetup}
             />
         </>
     );

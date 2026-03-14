@@ -10,6 +10,7 @@ import type {
     ChatSession,
     ConversationMessage,
     ChunkSnapshot,
+    EmailAccountOption,
 } from '../main/types';
 
 type RunIndexOptions = {
@@ -51,12 +52,12 @@ declare global {
                 onError: (error: string) => void;
                 onDone: () => void;
             }) => () => void;
-            ask: (query: string, limit?: number, mode?: 'qa' | 'chat', searchMode?: 'auto' | 'knowledge' | 'direct') => Promise<QaResponse>;
+            ask: (query: string, limit?: number, mode?: 'qa' | 'chat', searchMode?: 'auto' | 'knowledge' | 'direct' | 'agent') => Promise<QaResponse>;
             askStream: (query: string, limit: number, mode: 'qa' | 'chat', callbacks: {
                 onData: (chunk: string) => void;
                 onError: (error: string) => void;
                 onDone: () => void;
-            }, searchMode?: 'auto' | 'knowledge' | 'direct', resumeToken?: string, useVisionForAnswer?: boolean) => () => void;
+            }, searchMode?: 'auto' | 'knowledge' | 'direct' | 'agent', resumeToken?: string, useVisionForAnswer?: boolean) => () => void;
             health: () => Promise<HealthStatus>;
             readImage: (filePath: string) => Promise<string>;
             listChatSessions: (limit?: number, offset?: number) => Promise<ChatSession[]>;
@@ -65,6 +66,10 @@ declare global {
             deleteChatSession: (sessionId: string) => Promise<{ id: string }>;
             updateChatSession: (sessionId: string, title: string) => Promise<ChatSession>;
             addChatMessage: (sessionId: string, message: Partial<ConversationMessage>) => Promise<ConversationMessage>;
+            updateChatMessage: (sessionId: string, messageId: string, message: Partial<ConversationMessage>) => Promise<ConversationMessage>;
+            confirmAgentTool: (confirmationId: string, overrides?: Record<string, unknown>) => Promise<{ status: string; tool: string; result: string }>;
+            cancelAgentTool: (confirmationId: string) => Promise<{ status: string; tool: string }>;
+            listEmailAccounts: () => Promise<EmailAccountOption[]>;
             exportLogs: () => Promise<{ exported: boolean; path: string | null; error?: string }>;
             getLogsPath: () => Promise<string>;
             // User Memory APIs
@@ -203,6 +208,28 @@ declare global {
                 filesPrivate: number;
             }>;
             pluginInvoke: (pluginId: string, method: string, ...args: any[]) => Promise<any>;
+
+            // Provider configuration (local ↔ remote switching)
+            getProviderConfig: () => Promise<{
+                llm_provider: 'local' | 'remote';
+                rerank_provider: 'local' | 'remote';
+                remote_llm: { base_url: string; api_key: string; model: string; provider_hint: string };
+                remote_rerank: { base_url: string; api_key: string; model: string; provider_hint: string };
+                remote_vision_model: string;
+            }>;
+            updateProviderConfig: (patch: Record<string, unknown>) => Promise<{
+                llm_provider: 'local' | 'remote';
+                rerank_provider: 'local' | 'remote';
+                remote_llm: { base_url: string; api_key: string; model: string; provider_hint: string };
+                remote_rerank: { base_url: string; api_key: string; model: string; provider_hint: string };
+                remote_vision_model: string;
+            }>;
+            testProviderConnection: (params: { base_url: string; api_key?: string; model?: string; provider_hint?: string }) => Promise<{
+                ok: boolean;
+                latency_ms: number | null;
+                model_echo: string | null;
+                error: string | null;
+            }>;
         };
     }
 }

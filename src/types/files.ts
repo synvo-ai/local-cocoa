@@ -365,7 +365,30 @@ export interface AnalysisProgress {
     isComplete: boolean;
 }
 
+export interface ToolCallInfo {
+    callId: string;
+    tool: string;
+    args: Record<string, unknown>;
+    result?: string;
+    success?: boolean;
+    /** Set when the tool requires user confirmation (side_effect tools) */
+    confirmationId?: string;
+    /** 'pending' = awaiting user, 'confirmed' = user approved, 'cancelled' = user rejected */
+    confirmStatus?: 'pending' | 'confirmed' | 'cancelled';
+    /** Result from the confirmed execution */
+    confirmResult?: string;
+}
+
+export interface EmailAccountOption {
+    id: string;
+    label: string;
+    username: string;
+    protocol: string;
+    totalMessages?: number;
+}
+
 export interface ConversationMessage {
+    id?: string;
     role: 'user' | 'assistant';
     text: string;
     timestamp: string;
@@ -379,6 +402,7 @@ export interface ConversationMessage {
     needsUserDecision?: boolean;
     resumeToken?: string | null;
     decisionMessage?: string;
+    toolCalls?: ToolCallInfo[];
 }
 
 export interface ChatSession {

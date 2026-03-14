@@ -6,6 +6,7 @@ import mascot from '../assets/cocoa-mascot.png';
 
 interface WelcomeSetupProps {
     onComplete?: () => void;
+    onSkip?: () => void;
 }
 
 interface ModelGroup {
@@ -68,7 +69,7 @@ function groupAssets(assets: Array<{ id: string; label: string; exists: boolean;
     });
 }
 
-export function WelcomeSetup({ onComplete }: WelcomeSetupProps) {
+export function WelcomeSetup({ onComplete, onSkip }: WelcomeSetupProps) {
     const { modelStatus, modelDownloadEvent, modelsReady, presets, loadPresets, applyPreset, selectedPreset, loadRecommendedPreset, recommendedPreset, handleDownloadSelectedModels } = useModelStatus();
     const [currentStep, setCurrentStep] = useState<'welcome' | 'downloading' | 'complete'>('welcome');
     const [hasStartedDownload, setHasStartedDownload] = useState(false);
@@ -434,22 +435,33 @@ export function WelcomeSetup({ onComplete }: WelcomeSetupProps) {
             {/* Footer with action button */}
             <div className="shrink-0 p-6 border-t bg-muted/30">
                 {currentStep === 'welcome' && (
-                    <button
-                        onClick={handleStartDownload}
-                        disabled={isApplyingPreset}
-                        className={cn(
-                            "w-full flex items-center justify-center gap-3 py-4 px-6 rounded-xl",
-                            "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600",
-                            "text-white font-semibold text-base shadow-lg",
-                            "transition-all duration-200 hover:shadow-xl hover:scale-[1.02]",
-                            "focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2",
-                            "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    <div className="space-y-3">
+                        <button
+                            onClick={handleStartDownload}
+                            disabled={isApplyingPreset}
+                            className={cn(
+                                "w-full flex items-center justify-center gap-3 py-4 px-6 rounded-xl",
+                                "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600",
+                                "text-white font-semibold text-base shadow-lg",
+                                "transition-all duration-200 hover:shadow-xl hover:scale-[1.02]",
+                                "focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2",
+                                "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
+                            )}
+                        >
+                            <Download className="h-5 w-5" />
+                            {isApplyingPreset ? 'Applying preset...' : 'Download AI Models'}
+                            <ChevronRight className="h-5 w-5 ml-1" />
+                        </button>
+                        {onSkip && (
+                            <button
+                                onClick={onSkip}
+                                className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                            >
+                                Skip — I&apos;ll use external endpoints instead
+                                <ChevronRight className="h-4 w-4" />
+                            </button>
                         )}
-                    >
-                        <Download className="h-5 w-5" />
-                        {isApplyingPreset ? 'Applying preset...' : 'Download AI Models'}
-                        <ChevronRight className="h-5 w-5 ml-1" />
-                    </button>
+                    </div>
                 )}
 
                 {currentStep === 'downloading' && (

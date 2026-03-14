@@ -1,11 +1,12 @@
 import { FormEvent, useMemo, useState, useRef, useEffect, useCallback, CSSProperties } from 'react';
-import { Send, RefreshCw, FileText, ChevronDown, Zap, BookOpen, MessageCircle, Eye } from 'lucide-react';
+import { Send, RefreshCw, FileText, ChevronDown, Zap, BookOpen, MessageCircle, Eye, Bot } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import type { SearchHit, ConversationMessage, IndexedFile, ModelAssetStatus } from '../types';
 import { LoadingDots } from './LoadingDots';
 import { AgentProcess } from './AgentProcess';
 import { ThinkingProcess } from './ThinkingProcess';
 import { RecalledContext, getReferenceLabel } from './ReferenceContext';
+import { ToolConfirmCard, ToolCallBadges } from './ToolConfirmCard';
 import { useSkin } from './skin-provider';
 import { cn } from '../lib/utils';
 import cocoaMascot from '../assets/cocoa-mascot.png';
@@ -13,7 +14,7 @@ import cocoaBranchLeft from '../assets/cocoa-branch-left.png';
 import cocoaBranchRight from '../assets/cocoa-branch-right.png';
 import localCocoaLogo from '../assets/local_cocoa_logo_full.png';
 
-export type SearchMode = 'auto' | 'knowledge' | 'direct';
+export type SearchMode = 'auto' | 'knowledge' | 'direct' | 'agent';
 
 const SEARCH_MODE_CONFIG = {
     auto: {
@@ -30,6 +31,11 @@ const SEARCH_MODE_CONFIG = {
         label: 'Direct',
         description: 'Chat without file search',
         icon: MessageCircle,
+    },
+    agent: {
+        label: 'Agent',
+        description: 'AI agent with tool use',
+        icon: Bot,
     },
 } as const;
 
@@ -57,6 +63,14 @@ interface ConversationPanelProps {
     agentContext?: AgentContext | null;
     files?: IndexedFile[];
     onResume?: (mode?: SearchMode) => Promise<void>;
+    onUpdateToolCallStatus?: (
+        messageIndex: number,
+        callId: string,
+        status: 'confirmed' | 'cancelled',
+        result?: string,
+        updatedArgs?: Record<string, unknown>
+    ) => void;
+    currentSessionId?: string | null;
 }
 
 export function ConversationPanel({
@@ -74,7 +88,9 @@ export function ConversationPanel({
     onResetConversation,
     agentContext,
     files = [],
-    onResume
+    onResume,
+    onUpdateToolCallStatus,
+    currentSessionId
 }: ConversationPanelProps) {
     const [input, setInput] = useState('');
     const [suggestionQuery, setSuggestionQuery] = useState<string | null>(null);
@@ -92,6 +108,32 @@ export function ConversationPanel({
 
     const dragStyle = { WebkitAppRegion: 'drag' } as CSSProperties;
     const noDragStyle = { WebkitAppRegion: 'no-drag' } as CSSProperties;
+
+    // Persist and restore search mode
+    useEffect(() => {
+        if (currentSessionId) {
+            const savedMode = localStorage.getItem(`chatMode_${currentSessionId}`);
+            if (savedMode && Object.keys(SEARCH_MODE_CONFIG).includes(savedMode)) {
+                setSearchMode(savedMode as SearchMode);
+                return;
+            }
+        }
+        
+        // Fallback to the last globally selected mode if available
+        const lastGlobalMode = localStorage.getItem('chatMode_last');
+        if (lastGlobalMode && Object.keys(SEARCH_MODE_CONFIG).includes(lastGlobalMode)) {
+            setSearchMode(lastGlobalMode as SearchMode);
+        }
+    }, [currentSessionId]);
+
+    const handleModeSelect = (mode: SearchMode) => {
+        setSearchMode(mode);
+        if (currentSessionId) {
+            localStorage.setItem(`chatMode_${currentSessionId}`, mode);
+        }
+        localStorage.setItem(`chatMode_last`, mode);
+        setIsModeDropdownOpen(false);
+    };
 
     // Close mode dropdown when clicking outside
     useEffect(() => {
@@ -459,6 +501,9 @@ export function ConversationPanel({
                     messages.map((message, index) => {
                         const messageKey = `${message.timestamp}-${index}`;
                         const isUser = message.role === 'user';
+                        const hasConfirmationCards = !isUser && Boolean(message.toolCalls?.some(tc => tc.confirmationId));
+                        const normalizedText = (message.text || '').trim();
+                        const hideMessageBubble = hasConfirmationCards && (!normalizedText || message.meta === 'Executed' || message.meta === 'Cancelled');
 
                         return (
                             <div key={messageKey} className={cn("flex", isUser ? "justify-end" : "justify-start")}>
@@ -520,24 +565,56 @@ export function ConversationPanel({
                                         </div>
                                     )}
 
-                                    <div
-                                        className={cn(
-                                            "rounded-2xl px-5 py-3.5 text-sm leading-relaxed shadow-sm",
-                                            isUser
-                                                ? "bg-primary text-primary-foreground"
-                                                : "bg-muted/50 text-foreground border"
-                                        )}
-                                    >
-                                        {!isUser && !message.text && message.meta ? (
-                                            <div className="flex items-center gap-2 py-1">
-                                                <LoadingDots label={message.meta} />
-                                            </div>
-                                        ) : (
-                                            renderMessageText(message.text, message.references)
-                                        )}
-                                    </div>
+                                    {/* Read-only tool call badges */}
+                                    {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
+                                        <ToolCallBadges toolCalls={message.toolCalls} />
+                                    )}
 
-                                    {!isUser && message.meta && message.text && (
+                                    {/* Side-effect tool confirmation cards */}
+                                    {!isUser && message.toolCalls?.filter(tc => tc.confirmationId).map(tc => (
+                                        <div key={tc.callId} className="ml-1 mb-3">
+                                            <ToolConfirmCard
+                                                toolCall={tc}
+                                                onConfirm={async (cid, overrides) => {
+                                                    try {
+                                                        const res = await window.api.confirmAgentTool(cid, overrides);
+                                                        onUpdateToolCallStatus?.(index, tc.callId, 'confirmed', res?.result ?? 'Executed', overrides);
+                                                    } catch (err) {
+                                                        console.error('Confirm failed:', err);
+                                                    }
+                                                }}
+                                                onCancel={async (cid) => {
+                                                    try {
+                                                        await window.api.cancelAgentTool(cid);
+                                                        onUpdateToolCallStatus?.(index, tc.callId, 'cancelled');
+                                                    } catch (err) {
+                                                        console.error('Cancel failed:', err);
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                    ))}
+
+                                    {!hideMessageBubble && (
+                                        <div
+                                            className={cn(
+                                                "rounded-2xl px-5 py-3.5 text-sm leading-relaxed shadow-sm",
+                                                isUser
+                                                    ? "bg-primary text-primary-foreground"
+                                                    : "bg-muted/50 text-foreground border"
+                                            )}
+                                        >
+                                            {!isUser && !message.text && message.meta ? (
+                                                <div className="flex items-center gap-2 py-1">
+                                                    <LoadingDots label={message.meta} />
+                                                </div>
+                                            ) : (
+                                                renderMessageText(message.text, message.references)
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {!isUser && !hideMessageBubble && message.meta && message.text && (
                                         <div className="ml-1 flex items-center gap-2 text-[10px] text-muted-foreground">
                                             {message.meta === 'Thinking...' ? (
                                                 <span className="flex items-center gap-1 text-primary">
@@ -627,18 +704,19 @@ export function ConversationPanel({
                                     return;
                                 }
                             }
+
                             setSuggestionQuery(null);
                         }}
                         onKeyDown={(e) => {
                             if (suggestionQuery !== null && filteredFiles.length > 0) {
-                                if (e.key === 'ArrowUp') {
-                                    e.preventDefault();
-                                    setSelectedIndex(prev => (prev > 0 ? prev - 1 : filteredFiles.length - 1));
-                                    return;
-                                }
                                 if (e.key === 'ArrowDown') {
                                     e.preventDefault();
-                                    setSelectedIndex(prev => (prev < filteredFiles.length - 1 ? prev + 1 : 0));
+                                    setSelectedIndex(prev => (prev + 1) % filteredFiles.length);
+                                    return;
+                                }
+                                if (e.key === 'ArrowUp') {
+                                    e.preventDefault();
+                                    setSelectedIndex(prev => (prev - 1 + filteredFiles.length) % filteredFiles.length);
                                     return;
                                 }
                                 if (e.key === 'Enter' || e.key === 'Tab') {
@@ -646,7 +724,6 @@ export function ConversationPanel({
                                     const file = filteredFiles[selectedIndex];
                                     if (file) {
                                         const lastAt = input.lastIndexOf('@');
-                                        // We assume suggestionQuery is valid here
                                         const queryLen = suggestionQuery?.length || 0;
                                         const nameToInsert = file.name.includes(' ') ? `"${file.name}"` : file.name;
                                         const newValue = input.slice(0, lastAt) + `@${nameToInsert} ` + input.slice(lastAt + 1 + queryLen);
@@ -759,10 +836,7 @@ export function ConversationPanel({
                                         <button
                                             key={mode}
                                             type="button"
-                                            onClick={() => {
-                                                setSearchMode(mode);
-                                                setIsModeDropdownOpen(false);
-                                            }}
+                                            onClick={() => handleModeSelect(mode)}
                                             className={cn(
                                                 "w-full flex items-start gap-2.5 px-3 py-2 text-left transition-colors",
                                                 isCocoaSkin

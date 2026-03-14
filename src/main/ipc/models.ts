@@ -2,7 +2,7 @@ import { ipcMain } from 'electron';
 import { ModelManager } from '../modelManager';
 import { ServiceManager } from '../serviceManager';
 import { updateLogSettings } from '../logger';
-import { updateSettings, stopPythonModel, updateVLMConfig, updateEmbeddingConfig, updateRerankerConfig, updateWhisperConfig } from '../backendClient';
+import { updateSettings, stopPythonModel, updateVLMConfig, updateEmbeddingConfig, updateRerankerConfig, updateWhisperConfig, getProviderConfig, updateProviderConfig, testProviderConnection } from '../backendClient';
 
 export function registerModelHandlers(modelManager: ModelManager, serviceManager: ServiceManager) {
     ipcMain.handle('models:status', async () => modelManager.getStatus());
@@ -216,5 +216,18 @@ export function registerModelHandlers(modelManager: ModelManager, serviceManager
     ipcMain.handle('models:add', async (_event, descriptor) => {
         await modelManager.addModel(descriptor);
         return descriptor;
+    });
+
+    // --- Provider configuration (local ↔ remote switching) ---
+    ipcMain.handle('providers:get-config', async () => {
+        return getProviderConfig();
+    });
+
+    ipcMain.handle('providers:update-config', async (_event, patch) => {
+        return updateProviderConfig(patch);
+    });
+
+    ipcMain.handle('providers:test-connection', async (_event, params: { base_url: string; api_key?: string; model?: string; provider_hint?: string }) => {
+        return testProviderConnection(params);
     });
 }

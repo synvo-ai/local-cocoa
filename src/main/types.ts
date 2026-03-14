@@ -42,3 +42,4 @@ export type ModelDownloadEvent = import('../types/files').ModelDownloadEvent;
 
 export type ChatSession = import('../types/files').ChatSession;
 export type ConversationMessage = import('../types/files').ConversationMessage;
+export type EmailAccountOption = import('../types/files').EmailAccountOption;

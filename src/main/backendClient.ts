@@ -24,6 +24,7 @@ import type {
     ChatSession,
     ConversationMessage,
     ChunkSnapshot,
+    EmailAccountOption,
 } from './types';
 
 export interface FailedFile {
@@ -376,6 +377,7 @@ function mapQaResponse(payload: any): QaResponse {
 
 function mapChatMessage(payload: any): ConversationMessage {
     return {
+        id: payload.id ? String(payload.id) : undefined,
         role: payload.role ?? 'user',
         text: payload.content ?? payload.text ?? '',
         timestamp: payload.timestamp ?? new Date().toISOString(),
@@ -385,7 +387,13 @@ function mapChatMessage(payload: any): ConversationMessage {
         isMultiPath: payload.is_multi_path ?? payload.isMultiPath,
         thinkingSteps: Array.isArray(payload.thinking_steps ?? payload.thinkingSteps)
             ? (payload.thinking_steps ?? payload.thinkingSteps)
-            : undefined
+            : undefined,
+        needsUserDecision: payload.needs_user_decision ?? payload.needsUserDecision ?? undefined,
+        resumeToken: payload.resume_token ?? payload.resumeToken ?? undefined,
+        decisionMessage: payload.decision_message ?? payload.decisionMessage ?? undefined,
+        toolCalls: Array.isArray(payload.tool_calls ?? payload.toolCalls)
+            ? (payload.tool_calls ?? payload.toolCalls)
+            : undefined,
     };
 }
 
@@ -950,6 +958,97 @@ export async function askWorkspaceStream(
     }
 }
 
+export async function askAgentStream(
+    query: string,
+    limit: number | undefined,
+    _mode: 'qa' | 'chat' = 'qa',
+    onData: (chunk: string) => void,
+    onError: (error: Error) => void,
+    onDone: () => void,
+    _searchMode: 'auto' | 'knowledge' | 'direct' | 'agent' = 'agent',
+    resumeToken?: string,
+    useVisionForAnswer?: boolean,
+    conversationHistory?: any[]
+): Promise<void> {
+    const payload = { 
+        query,
+        ...(conversationHistory ? { conversation_history: conversationHistory } : {})
+    };
+    console.log('[backendClient] askAgentStream payload:', JSON.stringify(payload));
+    try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        const key = getLocalKey();
+        if (key) {
+            headers['X-API-Key'] = key;
+        }
+
+        const response = await fetch(resolveEndpoint('/agent/stream'), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Backend responded with ${response.status}`);
+        }
+
+        if (!response.body) {
+            throw new Error('No response body');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                break;
+            }
+            const chunk = decoder.decode(value, { stream: true });
+            onData(chunk);
+        }
+        onDone();
+    } catch (error) {
+        onError(error instanceof Error ? error : new Error(String(error)));
+    }
+}
+
+export async function confirmAgentTool(confirmationId: string): Promise<{ status: string; tool: string; result: string }> {
+    return requestJson('/agent/tool/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ confirmation_id: confirmationId })
+    });
+}
+
+export async function confirmAgentToolWithOverrides(
+    confirmationId: string,
+    overrides?: Record<string, unknown>
+): Promise<{ status: string; tool: string; result: string }> {
+    return requestJson('/agent/tool/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ confirmation_id: confirmationId, overrides })
+    });
+}
+
+export async function cancelAgentTool(confirmationId: string): Promise<{ status: string; tool: string }> {
+    return requestJson('/agent/tool/cancel', {
+        method: 'POST',
+        body: JSON.stringify({ confirmation_id: confirmationId }),
+    });
+}
+
+export async function listEmailAccounts(): Promise<EmailAccountOption[]> {
+    const data = await requestJson<any[]>('/plugins/synvo_ai_mail/accounts', { method: 'GET' });
+    const payload = Array.isArray(data) ? data : [];
+    return payload.map((item: any) => ({
+        id: String(item.id ?? ''),
+        label: String(item.label ?? ''),
+        username: String(item.username ?? ''),
+        protocol: String(item.protocol ?? ''),
+        totalMessages: Number(item.total_messages ?? item.totalMessages ?? 0),
+    }));
+}
+
 
 
 
@@ -1027,12 +1126,44 @@ export async function addChatMessage(sessionId: string, message: Partial<Convers
         references: message.references,
         // Multi-path thinking steps
         is_multi_path: message.isMultiPath,
-        thinking_steps: message.thinkingSteps
+        thinking_steps: message.thinkingSteps,
+        needs_user_decision: message.needsUserDecision,
+        resume_token: message.resumeToken,
+        decision_message: message.decisionMessage,
+        tool_calls: message.toolCalls,
     };
     const data = await requestJson(`/chat/sessions/${encodeURIComponent(sessionId)}/messages`, {
         method: 'POST',
         body: JSON.stringify(body)
     });
+    return mapChatMessage(data);
+}
+
+export async function updateChatMessage(
+    sessionId: string,
+    messageId: string,
+    message: Partial<ConversationMessage>
+): Promise<ConversationMessage> {
+    const body = {
+        role: message.role,
+        content: message.text,
+        timestamp: message.timestamp,
+        meta: message.meta,
+        references: message.references,
+        is_multi_path: message.isMultiPath,
+        thinking_steps: message.thinkingSteps,
+        needs_user_decision: message.needsUserDecision,
+        resume_token: message.resumeToken,
+        decision_message: message.decisionMessage,
+        tool_calls: message.toolCalls,
+    };
+    const data = await requestJson(
+        `/chat/sessions/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(messageId)}`,
+        {
+            method: 'PUT',
+            body: JSON.stringify(body)
+        }
+    );
     return mapChatMessage(data);
 }
 
@@ -1639,4 +1770,53 @@ export async function cancelThrottleOverride(): Promise<ThrottleOverrideStatus> 
 
 export async function getThrottleOverrideStatus(): Promise<ThrottleOverrideStatus> {
     return requestJson<ThrottleOverrideStatus>('/system/throttle-override', { method: 'GET' });
+}
+
+// ---------------------------------------------------------------------------
+// Provider configuration (local ↔ remote switching)
+// ---------------------------------------------------------------------------
+
+export interface RemoteEndpointConfig {
+    base_url: string;
+    api_key: string;
+    model: string;
+    provider_hint: 'openai' | 'anthropic' | 'gemini' | 'openrouter' | 'custom';
+}
+
+export interface ProviderConfig {
+    llm_provider: 'local' | 'remote';
+    rerank_provider: 'local' | 'remote';
+    remote_llm: RemoteEndpointConfig;
+    remote_rerank: RemoteEndpointConfig;
+    remote_vision_model: string;
+}
+
+export interface TestConnectionResult {
+    ok: boolean;
+    latency_ms: number | null;
+    model_echo: string | null;
+    error: string | null;
+}
+
+export async function getProviderConfig(): Promise<ProviderConfig> {
+    return requestJson<ProviderConfig>('/providers/config', { method: 'GET' });
+}
+
+export async function updateProviderConfig(patch: Partial<ProviderConfig>): Promise<ProviderConfig> {
+    return requestJson<ProviderConfig>('/providers/config', {
+        method: 'PUT',
+        body: JSON.stringify(patch),
+    });
+}
+
+export async function testProviderConnection(params: {
+    base_url: string;
+    api_key?: string;
+    model?: string;
+    provider_hint?: string;
+}): Promise<TestConnectionResult> {
+    return requestJson<TestConnectionResult>('/providers/test-connection', {
+        method: 'POST',
+        body: JSON.stringify(params),
+    });
 }

@@ -8,7 +8,9 @@ import { useWorkspaceData } from '../hooks/useWorkspaceData';
 import { useModelConfig } from '../hooks/useModelConfig';
 import { useModelStatus } from '../hooks/useModelStatus';
 import { useSystemStatus } from '../hooks/useSystemStatus';
+import { useProviderConfig } from '../hooks/useProviderConfig';
 import { cn } from '../lib/utils';
+import { RemoteConfigCard, RemoteConfigFields, LLM_PROVIDER_PRESETS, RERANKER_PROVIDER_PRESETS } from './ProviderConfigPanel';
 import type { ModelAssetStatus, ApiKey, ScanDirectory, ScanScope, ScanMode } from '../types';
 import cocoaMascot from '../assets/cocoa-mascot.png';
 import synvoLogo from '../../../assets/synvo_logo.png';
@@ -360,6 +362,7 @@ export function SettingsPanel({ initialTab = 'general' }: SettingsPanelProps) {
     const { config, loading: configLoading, updateConfig } = useModelConfig();
     const { modelStatus, handleRedownloadModel, modelDownloadEvent, runtimeStatus, presets, loadPresets, applyPreset, selectedPreset, loadRecommendedPreset, handleDownloadSelectedModels } = useModelStatus();
     const { status: liveSystemStatus } = useSystemStatus();
+    const provider = useProviderConfig();
 
     // Load presets on mount
     useEffect(() => {
@@ -1165,190 +1168,473 @@ export function SettingsPanel({ initialTab = 'general' }: SettingsPanelProps) {
 
                     {activeTab === 'models' && config && (
                         <div className="space-y-6">
-                            {/* Preset Selection */}
-                            <div className="rounded-lg border bg-card p-4 space-y-4">
-                                <div className="flex items-center gap-2">
-                                    <Sparkles className="h-4 w-4 text-amber-500" />
-                                    <h3 className="text-sm font-medium">Model Preset</h3>
+                            {/* ── Global Mode Switch ── */}
+                            {provider.loading ? (
+                                <div className="flex items-center justify-center py-4">
+                                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                    <span className="ml-2 text-xs text-muted-foreground">Loading provider config...</span>
                                 </div>
-                                <p className="text-xs text-muted-foreground">
-                                    Choose a preset optimized for your hardware. This will auto-configure the best models for you.
-                                </p>
-
-                                <div className="grid grid-cols-3 gap-3">
-                                    {presets && Object.entries(presets.presets).map(([id, preset]) => (
-                                        <button
-                                            key={id}
-                                            onClick={() => applyPreset(id as any)}
-                                            className={cn(
-                                                "relative flex flex-col items-start gap-2 p-3 rounded-lg border text-left transition-all hover:bg-accent",
-                                                selectedPreset === id
-                                                    ? "border-amber-500 bg-amber-50 dark:bg-amber-950/20 ring-1 ring-amber-500/20"
-                                                    : "bg-background"
-                                            )}
-                                        >
-                                            <div className="flex items-center justify-between w-full">
-                                                <span className="font-medium text-sm capitalize">{id}</span>
-                                                {id === 'eco' && <Battery className="h-3.5 w-3.5 text-emerald-500" />}
-                                                {id === 'balanced' && <Zap className="h-3.5 w-3.5 text-amber-500" />}
-                                                {id === 'pro' && <Gauge className="h-3.5 w-3.5 text-red-500" />}
+                            ) : (
+                                <div className="rounded-lg border bg-card p-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className={cn(
+                                                "h-8 w-8 rounded-lg flex items-center justify-center transition-colors",
+                                                provider.isCloudMode
+                                                    ? "bg-blue-500/10 text-blue-500"
+                                                    : "bg-emerald-500/10 text-emerald-600"
+                                            )}>
+                                                {provider.isCloudMode ? <Cloud className="h-4 w-4" /> : <Monitor className="h-4 w-4" />}
                                             </div>
-                                            <p className="text-[10px] text-muted-foreground leading-snug">
-                                                {preset.description}
-                                            </p>
-                                            <div className="flex items-center gap-2 mt-auto pt-2 w-full">
-                                                <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                                    ~{preset.estimatedVram}
+                                            <div>
+                                                <h3 className="text-sm font-medium">
+                                                    {provider.isCloudMode ? 'Cloud Mode' : 'Local Mode'}
+                                                </h3>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {provider.isCloudMode
+                                                        ? 'LLM & vision powered by remote API providers'
+                                                        : 'All models run locally on your device'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex rounded-lg border bg-muted/50 p-0.5">
+                                            <button
+                                                onClick={() => provider.setGlobalMode('local')}
+                                                disabled={provider.saving}
+                                                className={cn(
+                                                    'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                                                    !provider.isCloudMode
+                                                        ? 'bg-background shadow-sm text-foreground'
+                                                        : 'text-muted-foreground hover:text-foreground'
+                                                )}
+                                            >
+                                                <Monitor className="h-3.5 w-3.5" />
+                                                Local
+                                            </button>
+                                            <button
+                                                onClick={() => provider.setGlobalMode('remote')}
+                                                disabled={provider.saving}
+                                                className={cn(
+                                                    'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                                                    provider.isCloudMode
+                                                        ? 'bg-background shadow-sm text-foreground'
+                                                        : 'text-muted-foreground hover:text-foreground'
+                                                )}
+                                            >
+                                                <Cloud className="h-3.5 w-3.5" />
+                                                Cloud
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {provider.error && (
+                                        <p className="mt-2 text-xs text-destructive flex items-center gap-1">
+                                            <AlertCircle className="h-3 w-3" /> {provider.error}
+                                        </p>
+                                    )}
+                                    {provider.saveOk && (
+                                        <p className="mt-2 text-xs text-emerald-600 flex items-center gap-1">
+                                            <CheckCircle2 className="h-3 w-3" /> Saved
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* ── LOCAL MODE ── */}
+                            {!provider.isCloudMode && (
+                                <>
+                                    {/* Preset Selection */}
+                                    <div className="rounded-lg border bg-card p-4 space-y-4">
+                                        <div className="flex items-center gap-2">
+                                            <Sparkles className="h-4 w-4 text-amber-500" />
+                                            <h3 className="text-sm font-medium">Model Preset</h3>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Choose a preset optimized for your hardware. This will auto-configure the best models for you.
+                                        </p>
+
+                                        <div className="grid grid-cols-3 gap-3">
+                                            {presets && Object.entries(presets.presets).map(([id, preset]) => (
+                                                <button
+                                                    key={id}
+                                                    onClick={() => applyPreset(id as any)}
+                                                    className={cn(
+                                                        "relative flex flex-col items-start gap-2 p-3 rounded-lg border text-left transition-all hover:bg-accent",
+                                                        selectedPreset === id
+                                                            ? "border-amber-500 bg-amber-50 dark:bg-amber-950/20 ring-1 ring-amber-500/20"
+                                                            : "bg-background"
+                                                    )}
+                                                >
+                                                    <div className="flex items-center justify-between w-full">
+                                                        <span className="font-medium text-sm capitalize">{id}</span>
+                                                        {id === 'eco' && <Battery className="h-3.5 w-3.5 text-emerald-500" />}
+                                                        {id === 'balanced' && <Zap className="h-3.5 w-3.5 text-amber-500" />}
+                                                        {id === 'pro' && <Gauge className="h-3.5 w-3.5 text-red-500" />}
+                                                    </div>
+                                                    <p className="text-[10px] text-muted-foreground leading-snug">
+                                                        {preset.description}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-auto pt-2 w-full">
+                                                        <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                                            ~{preset.estimatedVram}
+                                                        </span>
+                                                    </div>
+                                                    {selectedPreset === id && (
+                                                        <div className="absolute top-2 right-2">
+                                                            <CheckCircle2 className="h-3.5 w-3.5 text-amber-500" />
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Local Model Configuration */}
+                                    <div className="rounded-lg border bg-card p-4 space-y-6">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Active Multimodal Model</label>
+                                            <select
+                                                value={config.activeModelId}
+                                                onChange={(e) => updateConfig({ activeModelId: e.target.value })}
+                                                disabled={configLoading}
+                                                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                            >
+                                                {vlmModels.map((model) => (
+                                                    <option key={model.id} value={model.id}>
+                                                        {model.label} {model.exists ? '(Ready)' : '(Missing)'}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {embeddingModels.length > 0 && (
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">Active Embedding Model</label>
+                                                <select
+                                                    value={currentEmbeddingModelId}
+                                                    onChange={(e) => updateConfig({ activeEmbeddingModelId: e.target.value })}
+                                                    disabled={configLoading}
+                                                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                >
+                                                    {embeddingModels.map((model) => (
+                                                        <option key={model.id} value={model.id}>
+                                                            {model.label} {model.exists ? `(${(model.sizeBytes! / 1024 / 1024).toFixed(0)} MB)` : '(Missing)'}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Changing this will restart the embedding service.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {rerankerModels.length > 0 && (
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">Active Reranker Model</label>
+                                                <select
+                                                    value={currentRerankerModelId}
+                                                    onChange={(e) => updateConfig({ activeRerankerModelId: e.target.value })}
+                                                    disabled={configLoading}
+                                                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                >
+                                                    {rerankerModels.map((model) => (
+                                                        <option key={model.id} value={model.id}>
+                                                            {model.label} {model.exists ? `(${(model.sizeBytes! / 1024 / 1024).toFixed(0)} MB)` : '(Missing)'}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Changing this will restart the reranker service.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {audioModels.length > 0 && (
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">Active Audio Model (Speech Recognition)</label>
+                                                <select
+                                                    value={currentAudioModelId}
+                                                    onChange={(e) => updateConfig({ activeAudioModelId: e.target.value })}
+                                                    disabled={configLoading}
+                                                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                >
+                                                    {audioModels.map((model) => (
+                                                        <option key={model.id} value={model.id}>
+                                                            {model.label} {model.exists ? `(${(model.sizeBytes! / 1024 / 1024).toFixed(0)} MB)` : '(Missing)'}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Whisper model for Earlog transcription. Larger models are more accurate but slower.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-sm font-medium">Context Size</label>
+                                                <span className="text-xs font-mono text-muted-foreground">{config.contextSize} tokens</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={allowedContextSizes.length - 1}
+                                                step={1}
+                                                value={allowedContextSizes.indexOf(config.contextSize)}
+                                                onChange={(e) => handleContextSizeChange(allowedContextSizes[Number(e.target.value)])}
+                                                className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                                            />
+                                            <div className="flex justify-between text-xs text-muted-foreground">
+                                                <span>{allowedContextSizes[0]}</span>
+                                                <span>{allowedContextSizes[allowedContextSizes.length - 1]}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-sm font-medium">Vision Resolution</label>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {visionOptions.find(o => o.value === config.visionMaxPixels)?.label ?? 'Custom'}
                                                 </span>
                                             </div>
-                                            {selectedPreset === id && (
-                                                <div className="absolute top-2 right-2">
-                                                    <CheckCircle2 className="h-3.5 w-3.5 text-amber-500" />
-                                                </div>
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={visionOptions.length - 1}
+                                                step={1}
+                                                value={visionOptions.findIndex(o => o.value === config.visionMaxPixels)}
+                                                onChange={(e) => updateConfig({ visionMaxPixels: visionOptions[Number(e.target.value)].value })}
+                                                className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                                            />
+                                        </div>
 
-                            <div className="rounded-lg border bg-card p-4 space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Active Multimodal Model</label>
-                                    <select
-                                        value={config.activeModelId}
-                                        onChange={(e) => updateConfig({ activeModelId: e.target.value })}
-                                        disabled={configLoading}
-                                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                    >
-                                        {vlmModels.map((model) => (
-                                            <option key={model.id} value={model.id}>
-                                                {model.label} {model.exists ? '(Ready)' : '(Missing)'}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {embeddingModels.length > 0 && (
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Active Embedding Model</label>
-                                        <select
-                                            value={currentEmbeddingModelId}
-                                            onChange={(e) => updateConfig({ activeEmbeddingModelId: e.target.value })}
-                                            disabled={configLoading}
-                                            className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                        >
-                                            {embeddingModels.map((model) => (
-                                                <option key={model.id} value={model.id}>
-                                                    {model.label} {model.exists ? `(${(model.sizeBytes! / 1024 / 1024).toFixed(0)} MB)` : '(Missing)'}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <p className="text-xs text-muted-foreground">
-                                            Changing this will restart the embedding service.
-                                        </p>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-sm font-medium">Video Resolution</label>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {videoOptions.find(o => o.value === config.videoMaxPixels)?.label ?? 'Custom'}
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={videoOptions.length - 1}
+                                                step={1}
+                                                value={videoOptions.findIndex(o => o.value === config.videoMaxPixels)}
+                                                onChange={(e) => updateConfig({ videoMaxPixels: videoOptions[Number(e.target.value)].value })}
+                                                className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                                            />
+                                            <p className="text-xs text-muted-foreground">Lower resolution for faster video processing</p>
+                                        </div>
                                     </div>
-                                )}
+                                </>
+                            )}
 
-                                {rerankerModels.length > 0 && (
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Active Reranker Model</label>
-                                        <select
-                                            value={currentRerankerModelId}
-                                            onChange={(e) => updateConfig({ activeRerankerModelId: e.target.value })}
-                                            disabled={configLoading}
-                                            className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                        >
-                                            {rerankerModels.map((model) => (
-                                                <option key={model.id} value={model.id}>
-                                                    {model.label} {model.exists ? `(${(model.sizeBytes! / 1024 / 1024).toFixed(0)} MB)` : '(Missing)'}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <p className="text-xs text-muted-foreground">
-                                            Changing this will restart the reranker service.
-                                        </p>
-                                    </div>
-                                )}
-
-                                {audioModels.length > 0 && (
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Active Audio Model (Speech Recognition)</label>
-                                        <select
-                                            value={currentAudioModelId}
-                                            onChange={(e) => updateConfig({ activeAudioModelId: e.target.value })}
-                                            disabled={configLoading}
-                                            className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                        >
-                                            {audioModels.map((model) => (
-                                                <option key={model.id} value={model.id}>
-                                                    {model.label} {model.exists ? `(${(model.sizeBytes! / 1024 / 1024).toFixed(0)} MB)` : '(Missing)'}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <p className="text-xs text-muted-foreground">
-                                            Whisper model for Earlog transcription. Larger models are more accurate but slower.
-                                        </p>
-                                    </div>
-                                )}
-
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-sm font-medium">Context Size</label>
-                                        <span className="text-xs font-mono text-muted-foreground">{config.contextSize} tokens</span>
-                                    </div>
-                                    <input
-                                        type="range"
-                                        min={0}
-                                        max={allowedContextSizes.length - 1}
-                                        step={1}
-                                        value={allowedContextSizes.indexOf(config.contextSize)}
-                                        onChange={(e) => handleContextSizeChange(allowedContextSizes[Number(e.target.value)])}
-                                        className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                            {/* ── CLOUD MODE ── */}
+                            {provider.isCloudMode && (
+                                <>
+                                    {/* Cloud LLM / Vision Config */}
+                                    <RemoteConfigCard
+                                        title="Cloud LLM / Vision"
+                                        description="Used for chat, summarisation, and vision analysis"
+                                        providerPresets={LLM_PROVIDER_PRESETS}
+                                        draft={provider.llmDraft}
+                                        onDraftChange={provider.setLlmDraft}
+                                        onSave={provider.saveLlmConfig}
+                                        onTest={provider.testLlmConnection}
+                                        saving={provider.saving}
+                                        testing={provider.testingLlm}
+                                        testResult={provider.llmTestResult}
+                                        showKey={provider.showLlmKey}
+                                        onToggleKey={provider.toggleLlmKey}
+                                        extraFields={
+                                            <div className="mt-2">
+                                                <label className="block text-[11px] text-muted-foreground mb-1">
+                                                    Vision Model <span className="text-[10px] italic">(optional, falls back to LLM model)</span>
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={provider.visionModelDraft}
+                                                    onChange={(e) => provider.setVisionModelDraft(e.target.value)}
+                                                    placeholder="e.g. gpt-4o (leave blank to use same model)"
+                                                    className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                                />
+                                            </div>
+                                        }
                                     />
-                                    <div className="flex justify-between text-xs text-muted-foreground">
-                                        <span>{allowedContextSizes[0]}</span>
-                                        <span>{allowedContextSizes[allowedContextSizes.length - 1]}</span>
-                                    </div>
-                                </div>
 
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-sm font-medium">Vision Resolution</label>
-                                        <span className="text-xs text-muted-foreground">
-                                            {visionOptions.find(o => o.value === config.visionMaxPixels)?.label ?? 'Custom'}
-                                        </span>
-                                    </div>
-                                    <input
-                                        type="range"
-                                        min={0}
-                                        max={visionOptions.length - 1}
-                                        step={1}
-                                        value={visionOptions.findIndex(o => o.value === config.visionMaxPixels)}
-                                        onChange={(e) => updateConfig({ visionMaxPixels: visionOptions[Number(e.target.value)].value })}
-                                        className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
-                                    />
-                                </div>
+                                    {/* Reranker Section */}
+                                    <div className="rounded-lg border bg-card">
+                                        <div className="flex items-center justify-between px-4 py-3 border-b">
+                                            <div>
+                                                <p className="text-sm font-medium">Reranker</p>
+                                                <p className="text-[11px] text-muted-foreground">Used for search result ranking</p>
+                                            </div>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <span className="text-xs text-muted-foreground">Use local instead</span>
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={!provider.isRerankCloud}
+                                                    onClick={() => provider.setRerankProvider(provider.isRerankCloud ? 'local' : 'remote')}
+                                                    disabled={provider.saving}
+                                                    className={cn(
+                                                        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
+                                                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                                        "disabled:cursor-not-allowed disabled:opacity-50",
+                                                        !provider.isRerankCloud ? "bg-primary" : "bg-input"
+                                                    )}
+                                                >
+                                                    <span
+                                                        className={cn(
+                                                            "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform",
+                                                            !provider.isRerankCloud ? "translate-x-4" : "translate-x-0"
+                                                        )}
+                                                    />
+                                                </button>
+                                            </label>
+                                        </div>
 
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-sm font-medium">Video Resolution</label>
-                                        <span className="text-xs text-muted-foreground">
-                                            {videoOptions.find(o => o.value === config.videoMaxPixels)?.label ?? 'Custom'}
-                                        </span>
+                                        {provider.isRerankCloud ? (
+                                            <div className="px-4 py-3">
+                                                <RemoteConfigFields
+                                                    providerPresets={RERANKER_PROVIDER_PRESETS}
+                                                    draft={provider.rerankDraft}
+                                                    onDraftChange={provider.setRerankDraft}
+                                                    onSave={provider.saveRerankConfig}
+                                                    onTest={provider.testRerankConnection}
+                                                    saving={provider.saving}
+                                                    testing={provider.testingRerank}
+                                                    testResult={provider.rerankTestResult}
+                                                    showKey={provider.showRerankKey}
+                                                    onToggleKey={provider.toggleRerankKey}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="px-4 py-3 space-y-2">
+                                                {rerankerModels.length > 0 && (
+                                                    <>
+                                                        <label className="text-sm font-medium">Active Reranker Model</label>
+                                                        <select
+                                                            value={currentRerankerModelId}
+                                                            onChange={(e) => updateConfig({ activeRerankerModelId: e.target.value })}
+                                                            disabled={configLoading}
+                                                            className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                        >
+                                                            {rerankerModels.map((model) => (
+                                                                <option key={model.id} value={model.id}>
+                                                                    {model.label} {model.exists ? `(${(model.sizeBytes! / 1024 / 1024).toFixed(0)} MB)` : '(Missing)'}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Changing this will restart the reranker service.
+                                                        </p>
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
-                                    <input
-                                        type="range"
-                                        min={0}
-                                        max={videoOptions.length - 1}
-                                        step={1}
-                                        value={videoOptions.findIndex(o => o.value === config.videoMaxPixels)}
-                                        onChange={(e) => updateConfig({ videoMaxPixels: videoOptions[Number(e.target.value)].value })}
-                                        className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
-                                    />
-                                    <p className="text-xs text-muted-foreground">Lower resolution for faster video processing</p>
-                                </div>
-                            </div>
 
+                                    {/* Resolution Settings (always relevant — resize before sending to cloud) */}
+                                    <div className="rounded-lg border bg-card p-4 space-y-6">
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-medium">Resolution Settings</h4>
+                                            <p className="text-xs text-muted-foreground">Images and video frames are resized before being sent to the cloud provider</p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-sm font-medium">Vision Resolution</label>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {visionOptions.find(o => o.value === config.visionMaxPixels)?.label ?? 'Custom'}
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={visionOptions.length - 1}
+                                                step={1}
+                                                value={visionOptions.findIndex(o => o.value === config.visionMaxPixels)}
+                                                onChange={(e) => updateConfig({ visionMaxPixels: visionOptions[Number(e.target.value)].value })}
+                                                className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-sm font-medium">Video Resolution</label>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {videoOptions.find(o => o.value === config.videoMaxPixels)?.label ?? 'Custom'}
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={videoOptions.length - 1}
+                                                step={1}
+                                                value={videoOptions.findIndex(o => o.value === config.videoMaxPixels)}
+                                                onChange={(e) => updateConfig({ videoMaxPixels: videoOptions[Number(e.target.value)].value })}
+                                                className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                                            />
+                                            <p className="text-xs text-muted-foreground">Lower resolution for faster video processing</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Always-Local Models */}
+                                    <div className="rounded-lg border bg-card p-4 space-y-6">
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-medium">Always-Local Models</h4>
+                                            <p className="text-xs text-muted-foreground">
+                                                Embedding and Whisper always run locally — vector dimensions and audio format compatibility require it.
+                                            </p>
+                                        </div>
+
+                                        {embeddingModels.length > 0 && (
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">Active Embedding Model</label>
+                                                <select
+                                                    value={currentEmbeddingModelId}
+                                                    onChange={(e) => updateConfig({ activeEmbeddingModelId: e.target.value })}
+                                                    disabled={configLoading}
+                                                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                >
+                                                    {embeddingModels.map((model) => (
+                                                        <option key={model.id} value={model.id}>
+                                                            {model.label} {model.exists ? `(${(model.sizeBytes! / 1024 / 1024).toFixed(0)} MB)` : '(Missing)'}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Changing this will restart the embedding service.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {audioModels.length > 0 && (
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">Active Audio Model (Speech Recognition)</label>
+                                                <select
+                                                    value={currentAudioModelId}
+                                                    onChange={(e) => updateConfig({ activeAudioModelId: e.target.value })}
+                                                    disabled={configLoading}
+                                                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                >
+                                                    {audioModels.map((model) => (
+                                                        <option key={model.id} value={model.id}>
+                                                            {model.label} {model.exists ? `(${(model.sizeBytes! / 1024 / 1024).toFixed(0)} MB)` : '(Missing)'}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Whisper model for Earlog transcription. Larger models are more accurate but slower.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+
+                            {/* ── Model Assets (always shown, VLM dimmed in cloud mode) ── */}
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-sm font-medium">Model Assets</h3>
@@ -1375,71 +1661,77 @@ export function SettingsPanel({ initialTab = 'general' }: SettingsPanelProps) {
                                     </button>
                                 </div>
                                 <div className="rounded-lg border bg-card p-4 space-y-6">
-                                    {modelGroups.map((group) => (
-                                        <div key={group.id} className="space-y-3">
-                                            <div className="flex items-center gap-2 pb-2 border-b">
-                                                <Box className="h-4 w-4 text-muted-foreground" />
-                                                <h3 className="text-sm font-medium">{group.label}</h3>
-                                                <div className={cn(
-                                                    "ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full",
-                                                    group.ready ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"
-                                                )}>
-                                                    {group.ready ? "Ready" : "Incomplete"}
+                                    {modelGroups.map((group) => {
+                                        const isDimmed = provider.isCloudMode && group.id === 'vlm';
+                                        return (
+                                            <div key={group.id} className={cn("space-y-3 transition-opacity", isDimmed && "opacity-40")}>
+                                                <div className="flex items-center gap-2 pb-2 border-b">
+                                                    <Box className="h-4 w-4 text-muted-foreground" />
+                                                    <h3 className="text-sm font-medium">{group.label}</h3>
+                                                    {isDimmed && (
+                                                        <span className="ml-1 text-[10px] text-muted-foreground italic">(not used in cloud mode)</span>
+                                                    )}
+                                                    <div className={cn(
+                                                        "ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full",
+                                                        group.ready ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"
+                                                    )}>
+                                                        {group.ready ? "Ready" : "Incomplete"}
+                                                    </div>
+                                                </div>
+                                                <div className="grid gap-3">
+                                                    {group.assets.map((asset) => {
+                                                        const isDownloadingThis = isDownloading && modelDownloadEvent?.assetId === asset.id;
+                                                        const disableRedownload = isDownloading && !isDownloadingThis;
+                                                        return (
+                                                            <div key={asset.id} className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3 transition-colors hover:bg-muted/50">
+                                                                <div className="flex items-center justify-between w-full">
+                                                                    <div className="flex items-start gap-3">
+                                                                        <div className={cn("mt-1.5 h-2 w-2 rounded-full shrink-0", asset.exists ? "bg-emerald-500" : "bg-amber-500")} />
+                                                                        <div className="min-w-0">
+                                                                            <p className="text-sm font-medium leading-none truncate">{asset.label}</p>
+                                                                            <p className="mt-1 text-xs text-muted-foreground font-mono truncate max-w-[300px]" title={asset.path}>
+                                                                                {asset.path.split('/').pop()}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-4 shrink-0">
+                                                                        {asset.sizeBytes && (
+                                                                            <span className="text-xs text-muted-foreground font-mono">{(asset.sizeBytes / 1024 / 1024).toFixed(1)} MB</span>
+                                                                        )}
+                                                                        {asset.exists ? <Check className="h-4 w-4 text-emerald-500" /> : <AlertCircle className="h-4 w-4 text-amber-500" />}
+                                                                    </div>
+                                                                </div>
+                                                                {asset.exists && (
+                                                                    <div className="flex items-center justify-end">
+                                                                        <button
+                                                                            onClick={() => handleRedownloadModel(asset.id)}
+                                                                            disabled={disableRedownload}
+                                                                            className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                            title="Remove the current file and download a fresh copy"
+                                                                        >
+                                                                            {isDownloadingThis ? <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                                                                            Force Redownload
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                                {isDownloadingThis && (
+                                                                    <div className="w-full">
+                                                                        <div className="flex items-center justify-between mb-1.5">
+                                                                            <span className="text-xs text-muted-foreground">{modelDownloadEvent.message}</span>
+                                                                            <span className="text-xs font-medium">{Math.round(modelDownloadEvent.percent ?? 0)}%</span>
+                                                                        </div>
+                                                                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-background/50">
+                                                                            <div className="h-full bg-primary transition-all duration-300 ease-in-out" style={{ width: `${modelDownloadEvent.percent ?? 0}%` }} />
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
-                                            <div className="grid gap-3">
-                                                {group.assets.map((asset) => {
-                                                    const isDownloadingThis = isDownloading && modelDownloadEvent?.assetId === asset.id;
-                                                    const disableRedownload = isDownloading && !isDownloadingThis;
-                                                    return (
-                                                        <div key={asset.id} className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3 transition-colors hover:bg-muted/50">
-                                                            <div className="flex items-center justify-between w-full">
-                                                                <div className="flex items-start gap-3">
-                                                                    <div className={cn("mt-1.5 h-2 w-2 rounded-full shrink-0", asset.exists ? "bg-emerald-500" : "bg-amber-500")} />
-                                                                    <div className="min-w-0">
-                                                                        <p className="text-sm font-medium leading-none truncate">{asset.label}</p>
-                                                                        <p className="mt-1 text-xs text-muted-foreground font-mono truncate max-w-[300px]" title={asset.path}>
-                                                                            {asset.path.split('/').pop()}
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex items-center gap-4 shrink-0">
-                                                                    {asset.sizeBytes && (
-                                                                        <span className="text-xs text-muted-foreground font-mono">{(asset.sizeBytes / 1024 / 1024).toFixed(1)} MB</span>
-                                                                    )}
-                                                                    {asset.exists ? <Check className="h-4 w-4 text-emerald-500" /> : <AlertCircle className="h-4 w-4 text-amber-500" />}
-                                                                </div>
-                                                            </div>
-                                                            {asset.exists && (
-                                                                <div className="flex items-center justify-end">
-                                                                    <button
-                                                                        onClick={() => handleRedownloadModel(asset.id)}
-                                                                        disabled={disableRedownload}
-                                                                        className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                        title="Remove the current file and download a fresh copy"
-                                                                    >
-                                                                        {isDownloadingThis ? <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <RotateCcw className="h-3.5 w-3.5" />}
-                                                                        Force Redownload
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                            {isDownloadingThis && (
-                                                                <div className="w-full">
-                                                                    <div className="flex items-center justify-between mb-1.5">
-                                                                        <span className="text-xs text-muted-foreground">{modelDownloadEvent.message}</span>
-                                                                        <span className="text-xs font-medium">{Math.round(modelDownloadEvent.percent ?? 0)}%</span>
-                                                                    </div>
-                                                                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-background/50">
-                                                                        <div className="h-full bg-primary transition-all duration-300 ease-in-out" style={{ width: `${modelDownloadEvent.percent ?? 0}%` }} />
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
 
                                 {modelDownloadEvent?.message && !modelDownloadEvent.assetId && (

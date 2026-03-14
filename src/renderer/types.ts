@@ -25,6 +25,8 @@ export type {
     ModelStatusSummary,
     ConversationMessage,
     ChatSession,
+    ToolCallInfo,
+    EmailAccountOption,
     IndexOperationMode,
     IndexScope,
     RunIndexOptions,

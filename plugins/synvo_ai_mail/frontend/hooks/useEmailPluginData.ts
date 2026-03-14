@@ -5,6 +5,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { registerPluginDataHandler, unregisterPluginDataHandler } from '@/renderer/hooks/usePluginData';
+import { mailAPI } from '../renderer/api';
 import type { EmailAccountSummary } from '../types';
 import type { IndexingItem } from '@/renderer/types';
 
@@ -25,7 +26,7 @@ export function useEmailPluginData() {
         setLoading(true);
         try {
             // Fetch email accounts
-            const accounts = await api.listEmailAccounts?.() ?? [];
+            const accounts = await mailAPI.listAccounts();
             setEmailAccounts(accounts);
 
             // Fetch indexing status for each account

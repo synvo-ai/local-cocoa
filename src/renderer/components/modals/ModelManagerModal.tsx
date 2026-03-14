@@ -6,9 +6,10 @@ import { useModelStatus } from '../../hooks/useModelStatus';
 interface ModelManagerModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onSkipSetup?: () => void;
 }
 
-export function ModelManagerModal({ isOpen, onClose }: ModelManagerModalProps) {
+export function ModelManagerModal({ isOpen, onClose, onSkipSetup }: ModelManagerModalProps) {
     const { modelsReady } = useModelStatus();
 
     if (!isOpen) return null;
@@ -18,7 +19,7 @@ export function ModelManagerModal({ isOpen, onClose }: ModelManagerModalProps) {
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" style={{ WebkitAppRegion: 'no-drag' } as any}>
                 <div className="relative w-full max-w-2xl h-[85vh] rounded-2xl border bg-background shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-                    <WelcomeSetup onComplete={onClose} />
+                    <WelcomeSetup onComplete={onClose} onSkip={onSkipSetup} />
                 </div>
             </div>
         );

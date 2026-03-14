@@ -210,30 +210,9 @@ export function EmailConnectorsPanel({
         return (
             <div className={cn("flex h-full flex-col items-center justify-center p-8", className)}>
                 <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl bg-gradient-to-br from-[hsl(var(--card))] via-[hsl(var(--background))] to-[hsl(var(--muted))] p-12 text-center shadow-xl">
-                    {/* Decorative background elements */}
-                    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                        {/* Floating mail icons */}
-                        <div className="absolute top-6 left-8 opacity-[0.06] transform -rotate-12">
-                            <Mail className="h-20 w-20" />
-                        </div>
-                        <div className="absolute top-12 right-16 opacity-[0.04] transform rotate-6">
-                            <Mail className="h-14 w-14" />
-                        </div>
-                        <div className="absolute bottom-8 left-1/4 opacity-[0.03] transform rotate-12">
-                            <Mail className="h-16 w-16" />
-                        </div>
-                        <div className="absolute bottom-16 right-8 opacity-[0.05] transform -rotate-6">
-                            <Mail className="h-12 w-12" />
-                        </div>
-                        {/* Subtle gradient orbs */}
-                        <div className="absolute -top-20 -right-20 w-56 h-56 bg-primary/10 rounded-full blur-3xl" />
-                        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
-                    </div>
-
-                    <div className="relative z-10 flex flex-col items-center">
-                        {/* Animated mail icon with glow */}
+                    <div className="flex flex-col items-center">
+                        {/* Mail icon */}
                         <div className="relative mb-8 group">
-                            <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl scale-150 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                             <div className="relative p-5 bg-gradient-to-br from-primary/90 to-primary rounded-2xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-xl hover:-rotate-3">
                                 <Mail className="h-9 w-9 text-primary-foreground" />
                             </div>
@@ -284,7 +263,7 @@ export function EmailConnectorsPanel({
     }
 
     return (
-        <div className={cn("flex h-full flex-col gap-6 max-w-5xl mx-auto overflow-y-auto pb-8", className)}>
+        <div className={cn("flex h-full flex-col gap-6 max-w-5xl mx-auto overflow-y-auto p-6 pb-8 w-full", className)}>
             <div className="flex items-center justify-between pb-2">
                 <div className="space-y-1">
                     <h2 className="text-2xl font-bold tracking-tight">
