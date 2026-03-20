@@ -502,8 +502,9 @@ export function ConversationPanel({
                         const messageKey = `${message.timestamp}-${index}`;
                         const isUser = message.role === 'user';
                         const hasConfirmationCards = !isUser && Boolean(message.toolCalls?.some(tc => tc.confirmationId));
+                        const allToolsResolved = message.toolCalls?.every(tc => tc.confirmStatus === 'confirmed' || tc.confirmStatus === 'cancelled') ?? false;
                         const normalizedText = (message.text || '').trim();
-                        const hideMessageBubble = hasConfirmationCards && (!normalizedText || message.meta === 'Executed' || message.meta === 'Cancelled');
+                        const hideMessageBubble = hasConfirmationCards && (!normalizedText || allToolsResolved);
 
                         return (
                             <div key={messageKey} className={cn("flex", isUser ? "justify-end" : "justify-start")}>
@@ -567,7 +568,7 @@ export function ConversationPanel({
 
                                     {/* Read-only tool call badges */}
                                     {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
-                                        <ToolCallBadges toolCalls={message.toolCalls} />
+                                        <ToolCallBadges toolCalls={message.toolCalls} toolCallingMode={message.toolCallingMode} providerType={message.providerType} modelLabel={message.modelLabel} />
                                     )}
 
                                     {/* Side-effect tool confirmation cards */}

@@ -282,12 +282,42 @@ export function ToolConfirmCard({ toolCall, onConfirm, onCancel }: ToolConfirmCa
 }
 
 /** Show small badges for read-only tool calls so users see what the agent did */
-export function ToolCallBadges({ toolCalls }: { toolCalls: ToolCallInfo[] }) {
+export function ToolCallBadges({ toolCalls, toolCallingMode, providerType, modelLabel }: {
+    toolCalls: ToolCallInfo[];
+    toolCallingMode?: 'native' | 'fallback';
+    providerType?: 'local' | 'cloud';
+    modelLabel?: string;
+}) {
     const readOnly = toolCalls.filter(tc => !tc.confirmationId);
     if (readOnly.length === 0) return null;
 
     return (
-        <div className="flex flex-wrap gap-1.5 ml-1 mb-2">
+        <div className="flex flex-wrap items-center gap-1.5 ml-1 mb-2">
+            {providerType && (
+                <span
+                    className={cn(
+                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider border',
+                        providerType === 'local'
+                            ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-400'
+                            : 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-400'
+                    )}
+                    title={modelLabel || providerType}
+                >
+                    {providerType === 'local' ? '🖥️' : '☁️'} {modelLabel || providerType}
+                </span>
+            )}
+            {toolCallingMode && (
+                <span
+                    className={cn(
+                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider border',
+                        toolCallingMode === 'native'
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-400'
+                            : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400'
+                    )}
+                >
+                    {toolCallingMode === 'native' ? '🔗 native' : '📝 fallback'}
+                </span>
+            )}
             {readOnly.map(tc => (
                 <span
                     key={tc.callId}

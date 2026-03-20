@@ -403,6 +403,9 @@ export interface ConversationMessage {
     resumeToken?: string | null;
     decisionMessage?: string;
     toolCalls?: ToolCallInfo[];
+    toolCallingMode?: 'native' | 'fallback';
+    providerType?: 'local' | 'cloud';
+    modelLabel?: string;
 }
 
 export interface ChatSession {

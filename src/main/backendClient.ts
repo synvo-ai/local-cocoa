@@ -970,7 +970,7 @@ export async function askAgentStream(
     useVisionForAnswer?: boolean,
     conversationHistory?: any[]
 ): Promise<void> {
-    const payload = { 
+    const payload = {
         query,
         ...(conversationHistory ? { conversation_history: conversationHistory } : {})
     };

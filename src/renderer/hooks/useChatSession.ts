@@ -532,6 +532,15 @@ Title:`;
                                     meta: 'Waiting for confirmation...'
                                 });
                             } else if (payload.type === 'status') {
+                                // Handle structured status objects (e.g. tool_calling_mode)
+                                if (typeof payload.data === 'object' && payload.data?.tool_calling_mode) {
+                                    const mode = payload.data.tool_calling_mode;
+                                    const providerType = payload.data.provider_type as 'local' | 'cloud' | undefined;
+                                    const modelLabel = payload.data.model_label as string | undefined;
+                                    updateMessage({ toolCallingMode: mode, providerType, modelLabel });
+                                    // Don't overwrite the status text for this - just store it
+                                    continue;
+                                }
                                 // Map status codes to user-friendly messages
                                 const statusMessages: Record<string, string> = {
                                     'loading_model': 'Starting AI model...',
@@ -956,7 +965,7 @@ Title:`;
                                         }
                                         : tc
                                 );
-                                updateMessage({ 
+                                updateMessage({
                                     toolCalls: [...currentToolCalls],
                                     ...(needsUserDecision ? {
                                         needsUserDecision,
@@ -1419,63 +1428,63 @@ Title:`;
                             .catch(e => console.error('Failed to persist final message', e));
                     }
                 }
-                }, searchMode, token, undefined, history);
-            },
-            [sessions, agentContext]
-        );
+            }, searchMode, token, undefined, history);
+        },
+        [sessions, agentContext]
+    );
 
-        const updateToolCallStatus = useCallback(
-            (
-                messageIndex: number,
-                callId: string,
-                status: 'confirmed' | 'cancelled',
-                result?: string,
-                updatedArgs?: Record<string, unknown>
-            ) => {
-                setSessions(prev => prev.map(s => {
-                    if (s.id !== currentSessionId) return s;
-                    const msgs = [...s.messages];
-                    const msg = msgs[messageIndex];
-                    if (!msg?.toolCalls) return s;
-                    const targetToolCall = msg.toolCalls.find(tc => tc.callId === callId);
-                    const nextText = targetToolCall
-                        ? buildToolOutcomeText(targetToolCall, status, result, updatedArgs)
-                        : msg.text;
-                    msgs[messageIndex] = {
-                        ...msg,
-                        text: nextText,
-                        needsUserDecision: false,
-                        resumeToken: undefined,
-                        decisionMessage: undefined,
-                        meta: status === 'confirmed' ? 'Executed' : 'Cancelled',
-                        toolCalls: msg.toolCalls.map(tc =>
-                            tc.callId === callId
-                                ? {
-                                    ...tc,
-                                    args: updatedArgs ? { ...tc.args, ...updatedArgs } : tc.args,
-                                    confirmStatus: status,
-                                    confirmResult: result,
-                                }
-                                : tc
-                        )
-                    };
-                    
-                    // Persist state in background
-                    if (window.api.updateChatMessage && msg.id) {
-                        void window.api.updateChatMessage(s.id, msg.id, msgs[messageIndex]).catch(e => console.error('Failed to update tool call status', e));
-                    }
-                    
-                    return { ...s, messages: msgs };
-                }));
-            },
-            [currentSessionId]
-        );
+    const updateToolCallStatus = useCallback(
+        (
+            messageIndex: number,
+            callId: string,
+            status: 'confirmed' | 'cancelled',
+            result?: string,
+            updatedArgs?: Record<string, unknown>
+        ) => {
+            setSessions(prev => prev.map(s => {
+                if (s.id !== currentSessionId) return s;
+                const msgs = [...s.messages];
+                const msg = msgs[messageIndex];
+                if (!msg?.toolCalls) return s;
+                const targetToolCall = msg.toolCalls.find(tc => tc.callId === callId);
+                const nextText = targetToolCall
+                    ? buildToolOutcomeText(targetToolCall, status, result, updatedArgs)
+                    : msg.text;
+                msgs[messageIndex] = {
+                    ...msg,
+                    text: nextText,
+                    needsUserDecision: false,
+                    resumeToken: undefined,
+                    decisionMessage: undefined,
+                    meta: undefined,
+                    toolCalls: msg.toolCalls.map(tc =>
+                        tc.callId === callId
+                            ? {
+                                ...tc,
+                                args: updatedArgs ? { ...tc.args, ...updatedArgs } : tc.args,
+                                confirmStatus: status,
+                                confirmResult: result,
+                            }
+                            : tc
+                    )
+                };
 
-        return {
-            sessions,
-            currentSessionId,
-            currentSession,
-            messages,
+                // Persist state in background
+                if (window.api.updateChatMessage && msg.id) {
+                    void window.api.updateChatMessage(s.id, msg.id, msgs[messageIndex]).catch(e => console.error('Failed to update tool call status', e));
+                }
+
+                return { ...s, messages: msgs };
+            }));
+        },
+        [currentSessionId]
+    );
+
+    return {
+        sessions,
+        currentSessionId,
+        currentSession,
+        messages,
         agentContext,
         isAnswering,
         handleCreateSession,
