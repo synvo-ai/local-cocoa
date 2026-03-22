@@ -146,7 +146,7 @@ export function useWorkspaceData() {
 
         try {
             // First check if backend is reachable via health check
-            console.log('[useWorkspaceData] Calling health check...');
+            console.info('[useWorkspaceData] Calling health check...');
             const healthData = await api.health();
             console.debug('[useWorkspaceData] Health check result:', healthData);
 
@@ -155,7 +155,7 @@ export function useWorkspaceData() {
                 console.warn('[useWorkspaceData] Health check returned null');
                 if (backendStarting && startupRetryCountRef.current < maxStartupRetries) {
                     startupRetryCountRef.current += 1;
-                    console.log('[useWorkspaceData] Startup retry (null health):', startupRetryCountRef.current, '/', maxStartupRetries);
+                    console.info('[useWorkspaceData] Startup retry (null health):', startupRetryCountRef.current, '/', maxStartupRetries);
                     setHealth({
                         status: 'degraded',
                         indexedFiles: 0,
@@ -181,7 +181,7 @@ export function useWorkspaceData() {
 
                 if (isBackendReachable) {
                     // Backend is reachable but some services are offline - continue loading data
-                    console.log('[useWorkspaceData] Backend reachable despite degraded status, continuing...');
+                    console.info('[useWorkspaceData] Backend reachable despite degraded status, continuing...');
                     // Reset startup state since backend is actually responding
                     if (backendStarting) {
                         setBackendStarting(false);
@@ -193,7 +193,7 @@ export function useWorkspaceData() {
                     // During startup, silently wait for backend - don't spam errors
                     if (backendStarting && startupRetryCountRef.current < maxStartupRetries) {
                         startupRetryCountRef.current += 1;
-                        console.log('[useWorkspaceData] Startup retry:', startupRetryCountRef.current, '/', maxStartupRetries);
+                        console.info('[useWorkspaceData] Startup retry:', startupRetryCountRef.current, '/', maxStartupRetries);
                         return null;
                     }
                     // After startup period, log but don't spam
@@ -218,10 +218,10 @@ export function useWorkspaceData() {
             const isCurrentlyIndexing = healthData.status === 'indexing';
             const shouldSkipInventory = isCurrentlyIndexing && (refreshCountRef.current % 5 === 0);
 
-            console.log('[useWorkspaceData] Fetching data...');
+            console.debug('[useWorkspaceData] Fetching data...');
             const [summaryData, folderData, inventoryData, specsData, stageProgressData] = await Promise.all([
                 api.indexSummary(),
-                api.listFolders().then(f => { console.log('[useWorkspaceData] listFolders returned:', f.length, 'folders'); return f; }),
+                api.listFolders().then(f => { console.debug('[useWorkspaceData] listFolders returned:', f.length, 'folders'); return f; }),
                 shouldSkipInventory
                     // FIX: preserve previous indexingItems instead of hardcoding []
                     // The old code used `indexing: []` which flashed the queue empty on skipped refreshes
@@ -231,7 +231,7 @@ export function useWorkspaceData() {
                 (api as any).stageProgress ? (api as any).stageProgress() : Promise.resolve(null)
             ]);
 
-            console.log('[useWorkspaceData] Setting state - folders:', folderData.length, 'files:', inventoryData?.files?.length ?? '(skipped)');
+            console.info('[useWorkspaceData] Setting state - folders:', folderData.length, 'files:', inventoryData?.files?.length ?? '(skipped)');
             setHealth(healthData);
             setSystemSpecs(prev => jsonEqual(prev, specsData) ? prev : specsData);
             setSummary(prev => jsonEqual(prev, summaryData) ? prev : summaryData);
@@ -276,7 +276,7 @@ export function useWorkspaceData() {
             // During startup, silently handle errors to avoid log spam
             if (backendStarting && startupRetryCountRef.current < maxStartupRetries) {
                 startupRetryCountRef.current += 1;
-                console.log('[useWorkspaceData] Startup error retry:', startupRetryCountRef.current);
+                console.warn('[useWorkspaceData] Startup error retry:', startupRetryCountRef.current);
                 // Set degraded health status
                 setHealth({
                     status: 'degraded',
@@ -310,7 +310,7 @@ export function useWorkspaceData() {
         const poll = async () => {
             try {
                 const status = await api.indexStatus();
-                console.log('[useWorkspaceData] [StatusPoll] status:', status.status);
+                console.info('[useWorkspaceData] [StatusPoll] status:', status.status);
 
                 if (status.status === 'running' || status.status === 'paused') {
                     consecutiveIdle = 0;
@@ -326,7 +326,7 @@ export function useWorkspaceData() {
                             // Log active item progress for debugging
                             const active = (inventory.indexing as IndexingItem[]).find(i => i.status === 'processing');
                             if (active) {
-                                console.log('[useWorkspaceData] [StatusPoll] active:', active.fileName,
+                                console.debug('[useWorkspaceData] [StatusPoll] active:', active.fileName,
                                     'progress:', active.progress, 'detail:', active.detail,
                                     'step:', active.stepCurrent, '/', active.stepTotal,
                                     'events:', active.recentEvents?.length ?? 0);

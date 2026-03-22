@@ -447,12 +447,12 @@ export async function getHealth(): Promise<HealthStatus> {
 }
 
 export async function listFolders(): Promise<FolderRecord[]> {
-    console.log('[BackendClient] listFolders called...');
+    console.info('[BackendClient] listFolders called...');
     try {
         const data = await requestJson<{ folders: any[] }>('/folders', { method: 'GET' });
-        console.log('[BackendClient] listFolders raw response:', data);
+        console.debug('[BackendClient] listFolders raw response:', data);
         const folders = Array.isArray(data.folders) ? data.folders : [];
-        console.log('[BackendClient] listFolders mapped folders:', folders.length);
+        console.debug('[BackendClient] listFolders mapped folders:', folders.length);
         return folders.map(mapFolder);
     } catch (error) {
         console.error('[BackendClient] listFolders error:', error);
@@ -1711,6 +1711,7 @@ export interface BackendSettings {
     enable_memory_extraction: boolean;
     memory_extraction_stage: 'fast' | 'deep' | 'none';
     memory_chunk_size: number;
+    supported_extensions: string[];
 }
 
 /**

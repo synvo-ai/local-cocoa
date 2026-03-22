@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { Folder, Plus, Trash2, AlertTriangle, Info, ChevronDown, ChevronUp, FileText, Clock, ArrowUp } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { ConfirmModal } from './modals/ConfirmModal';
 import type { FolderRecord, IndexingItem, IndexedFile } from '../types';
 
 interface MonitoredFoldersPanelProps {
@@ -208,7 +209,7 @@ export function MonitoredFoldersPanel({
 }: MonitoredFoldersPanelProps) {
     const [isAdding, setIsAdding] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [confirming, setConfirming] = useState<string | null>(null);
+    const [folderToDelete, setFolderToDelete] = useState<{ id: string, name: string } | null>(null);
     const [folderModes, setFolderModes] = useState<Record<string, 'fast' | 'deep'>>({});
     const [expandedFolderId, setExpandedFolderId] = useState<string | null>(null);
 
@@ -343,7 +344,7 @@ export function MonitoredFoldersPanel({
         setError(null);
         try {
             await onRemove(folderId);
-            setConfirming(null);
+            setFolderToDelete(null);
         } catch (err) {
             console.error('Failed to remove folder', err);
             setError(err instanceof Error ? err.message : 'Unable to remove folder.');
@@ -537,39 +538,15 @@ export function MonitoredFoldersPanel({
                                             onSelect={(value) => handleIndexAll(folder.id, value as 'fast' | 'deep')}
                                         />
 
-                                        {/* Remove button with confirmation */}
-                                        {confirming === folder.id ? (
-                                            <div className="flex gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={async (e) => {
-                                                        const btn = e.currentTarget;
-                                                        btn.disabled = true;
-                                                        btn.textContent = 'Deleting...';
-                                                        await handleRemove(folder.id);
-                                                    }}
-                                                    className="inline-flex items-center justify-center rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/90"
-                                                >
-                                                    Confirm
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setConfirming(null)}
-                                                    className="inline-flex items-center justify-center rounded-md border bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={() => setConfirming(folder.id)}
-                                                className="inline-flex items-center justify-center rounded-md border border-destructive/50 bg-background px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                                            >
-                                                <Trash2 className="mr-2 h-3.5 w-3.5" />
-                                                Remove
-                                            </button>
-                                        )}
+                                        {/* Remove button with confirmation dialog */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setFolderToDelete({ id: folder.id, name: folder.label || folder.path })}
+                                            className="inline-flex items-center justify-center rounded-md border border-destructive/50 bg-background px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all duration-200"
+                                        >
+                                            <Trash2 className="mr-2 h-3.5 w-3.5" />
+                                            Remove
+                                        </button>
                                     </div>
                                 </div>
 
@@ -702,6 +679,26 @@ export function MonitoredFoldersPanel({
                     })
                 )}
             </div>
+            
+            <ConfirmModal
+                isOpen={!!folderToDelete}
+                title="Remove Monitored Folder?"
+                message={
+                    <>
+                        Are you sure you want to remove <span className="text-foreground font-semibold">&ldquo;{folderToDelete?.name}&rdquo;</span>? 
+                        The folder and its files will remain on your disk, but they will no longer be indexed or monitored.
+                    </>
+                }
+                confirmText="Remove"
+                cancelText="Keep it"
+                onClose={() => setFolderToDelete(null)}
+                onConfirm={() => {
+                    if (folderToDelete) {
+                        handleRemove(folderToDelete.id);
+                    }
+                }}
+            />
         </div>
     );
 }
+

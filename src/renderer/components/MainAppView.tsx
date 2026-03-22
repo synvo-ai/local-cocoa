@@ -256,9 +256,12 @@ export function MainAppView() {
     const handleRemoveFolder = useCallback(async (id: string) => {
         const api = window.api;
         if (!api?.removeFolder) return;
+        console.log(`[MainAppView] Removing folder with ID: ${id}`);
         try {
-            await api.removeFolder(id);
+            const result = await api.removeFolder(id);
+            console.log(`[MainAppView] removeFolder result:`, result);
             await refreshData();
+            console.log(`[MainAppView] Data refreshed after removal`);
         } catch (error) {
             console.error('Failed to remove folder', error);
         }

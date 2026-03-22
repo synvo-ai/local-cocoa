@@ -14,12 +14,13 @@ const PLUGIN_ID = 'mail';
 export function useEmailPluginData() {
     const [emailAccounts, setEmailAccounts] = useState<EmailAccountSummary[]>([]);
     const [emailIndexingByAccount, setEmailIndexingByAccount] = useState<Record<string, IndexingItem[]>>({});
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     const refreshData = useCallback(async () => {
         const api = window.api;
         if (!api) {
             console.warn('[EmailPlugin] No window.api available');
+            setLoading(false);
             return;
         }
 
@@ -64,8 +65,8 @@ export function useEmailPluginData() {
             pluginId: PLUGIN_ID,
             refreshData,
             cleanup: () => {
-                setEmailAccounts([]);
-                setEmailIndexingByAccount({});
+                // Keep data on unmount for smoother transitions
+                console.info(`[EmailPlugin] Cleanup - keeping data for next mount`);
             }
         });
 

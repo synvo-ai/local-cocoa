@@ -181,10 +181,15 @@ log.transports.file.format = (params: FormatParams) => {
  * Update log settings
  */
 export function updateLogSettings(): void {
-    // TODO: if necessary, should support more log levels and update python backend too
+    // Standardize log level to lowercase
+    const rawLevel = (config.logLevel || 'info').toLowerCase();
+    
+    // Validate if the level is recognized by electron-log
+    const validLevels = ['error', 'warn', 'info', 'verbose', 'debug', 'silly'];
+    const finalLevel = validLevels.includes(rawLevel) ? rawLevel : 'info';
 
-    log.transports.file.level = config.logLevel as any;
-    log.transports.console.level = config.logLevel as any;
+    log.transports.file.level = finalLevel as any;
+    log.transports.console.level = finalLevel as any;
 
     if (config.paths.electronLogPath) {
         // Ensure logs directory exists

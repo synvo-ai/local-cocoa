@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Mail, Brain } from 'lucide-react';
+import { Mail, Brain, Loader2 } from 'lucide-react';
 import { cn } from '@/renderer/lib/utils';
 import { EmailBrowser } from './EmailBrowser';
 import { EmailConnectorsPanel } from './EmailConnectorsPanel';
@@ -19,6 +19,7 @@ export function MailPluginMain({
     const {
         emailAccounts,
         emailIndexingByAccount,
+        loading,
         refreshData: refreshPluginData
     } = useEmailPluginData();
 
@@ -109,7 +110,14 @@ export function MailPluginMain({
 
             {/* Sub-view content */}
             <div className="flex-1 overflow-hidden">
-                {selectedEmailAccountId ? (
+                {loading && emailAccounts.length === 0 ? (
+                    <div className="flex h-full items-center justify-center">
+                        <div className="flex flex-col items-center gap-3">
+                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">Loading email data...</p>
+                        </div>
+                    </div>
+                ) : selectedEmailAccountId ? (
                     <EmailBrowser
                         messages={emailMessages?.[selectedEmailAccountId] ?? []}
                         selectedMessageId={selectedEmailMessageId ?? null}

@@ -87,6 +87,21 @@ async function isPathInIndexedFolders(targetPath: string): Promise<boolean> {
     }
 }
 
+async function getDialogFilters(options?: { filters?: Electron.FileFilter[] }): Promise<Electron.FileFilter[] | undefined> {
+    let filters = options?.filters;
+    if (!filters || filters.length === 0) {
+        try {
+            const settings = await getBackendSettings();
+            if (settings.supported_extensions && settings.supported_extensions.length > 0) {
+                filters = [{ name: 'Supported Files', extensions: settings.supported_extensions }];
+            }
+        } catch (error) {
+            console.error('[FilesIPC] Failed to fetch backend settings for file picker:', error);
+        }
+    }
+    return filters;
+}
+
 export function registerFileHandlers(windowManager: WindowManager) {
     ipcMain.handle('folders:pick', async () => {
         const openDialogOptions: Electron.OpenDialogOptions = {
@@ -117,7 +132,9 @@ export function registerFileHandlers(windowManager: WindowManager) {
         if (!folderId) {
             throw new Error('Missing folder id.');
         }
+        console.log(`[FilesIPC] Removing folder: ${folderId}`);
         await removeFolder(folderId);
+        console.log(`[FilesIPC] Successfully removed folder: ${folderId}`);
         return { id: folderId };
     });
 
@@ -255,9 +272,12 @@ export function registerFileHandlers(windowManager: WindowManager) {
 
     ipcMain.handle('files:pick-one', async (_event, options) => {
         if (!windowManager.mainWindow) return null;
+        
+        const filters = await getDialogFilters(options);
+
         const result = await dialog.showOpenDialog(windowManager.mainWindow, {
             properties: ['openFile'],
-            filters: options?.filters
+            filters: filters
         });
         if (result.canceled || result.filePaths.length === 0) return null;
         return result.filePaths[0];
@@ -265,9 +285,11 @@ export function registerFileHandlers(windowManager: WindowManager) {
 
     // Pick multiple files for indexing
     ipcMain.handle('files:pick-multiple', async (_event, options) => {
+        const filters = await getDialogFilters(options);
+
         const openDialogOptions: Electron.OpenDialogOptions = {
             properties: ['openFile', 'multiSelections'],
-            filters: options?.filters
+            filters: filters
         };
 
         const result = windowManager.mainWindow

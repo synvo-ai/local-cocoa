@@ -41,6 +41,7 @@ import {
     RefreshCw,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { ConfirmModal } from './modals/ConfirmModal';
 import type { FolderRecord, IndexedFile, IndexingItem, PrivacyLevel, MemoryStatus } from '../types';
 
 // ============================================
@@ -662,19 +663,19 @@ function getFileTypeConfig(kind: string) {
 // Folder Tree Node Component
 // ============================================
 
-interface FolderTreeNodeProps {
+interface IndexedFolderTreeNodeProps {
     node: TreeNode;
     depth: number;
     isSelected: boolean;
     expandedNodes: Set<string>;
     onSelect: (node: TreeNode) => void;
     onToggle: (nodeId: string) => void;
-    onRemove?: (folderId: string) => void;
+    onRemove?: (folderId: string, folderName: string) => void;
     onIndexAll?: (folderId: string, mode: 'fast' | 'deep') => void;
     onTogglePrivacy?: (folderId: string, currentLevel: PrivacyLevel) => void;
 }
 
-function FolderTreeNode({
+function IndexedFolderTreeNode({
     node,
     depth,
     isSelected,
@@ -684,8 +685,7 @@ function FolderTreeNode({
     onRemove,
     onIndexAll,
     onTogglePrivacy,
-}: FolderTreeNodeProps) {
-    const [confirming, setConfirming] = useState(false);
+}: IndexedFolderTreeNodeProps) {
     const isExpanded = expandedNodes.has(node.id);
     const hasChildren = node.children.length > 0;
     const isRoot = node.id === 'root';
@@ -772,44 +772,29 @@ function FolderTreeNode({
                 {/* Actions (only for non-root folders) */}
                 {!isRoot && node.folder && (
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {confirming ? (
-                            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                                <button
-                                    onClick={() => { onRemove?.(node.folder!.id); setConfirming(false); }}
-                                    className="px-1.5 py-0.5 text-[10px] rounded bg-destructive text-destructive-foreground"
-                                >
-                                    Remove
-                                </button>
-                                <button
-                                    onClick={() => setConfirming(false)}
-                                    className="px-1.5 py-0.5 text-[10px] rounded border"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        ) : (
-                            <ActionDropdown
-                                trigger={<MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />}
-                                options={[
-                                    { label: 'Fast Index All', value: 'fast', icon: Zap },
-                                    { label: 'Deep Index All', value: 'deep', icon: Eye },
-                                    { 
-                                        label: node.folder?.privacyLevel === 'private' ? 'Make Normal' : 'Make Private', 
-                                        value: 'toggle-privacy', 
-                                        icon: node.folder?.privacyLevel === 'private' ? ShieldOff : Shield 
-                                    },
-                                    { label: 'Remove Folder', value: 'remove', icon: Trash2, destructive: true },
-                                ]}
-                                onSelect={(value) => {
-                                    if (value === 'remove') setConfirming(true);
-                                    else if ((value === 'fast' || value === 'deep') && node.folder) {
-                                        onIndexAll?.(node.folder.id, value);
-                                    } else if (value === 'toggle-privacy' && node.folder) {
-                                        onTogglePrivacy?.(node.folder.id, node.folder.privacyLevel || 'normal');
-                                    }
-                                }}
-                            />
-                        )}
+                        <ActionDropdown
+                            trigger={<MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />}
+                            options={[
+                                { label: 'Fast Index All', value: 'fast', icon: Zap },
+                                { label: 'Deep Index All', value: 'deep', icon: Eye },
+                                { 
+                                    label: node.folder?.privacyLevel === 'private' ? 'Make Normal' : 'Make Private', 
+                                    value: 'toggle-privacy', 
+                                    icon: node.folder?.privacyLevel === 'private' ? ShieldOff : Shield 
+                                },
+                                { label: 'Remove Folder', value: 'remove', icon: Trash2, destructive: true },
+                            ]}
+                            onSelect={(value) => {
+                                if (value === 'remove' && node.folder) {
+                                    onRemove?.(node.folder.id, node.name);
+                                }
+                                else if ((value === 'fast' || value === 'deep') && node.folder) {
+                                    onIndexAll?.(node.folder.id, value);
+                                } else if (value === 'toggle-privacy' && node.folder) {
+                                    onTogglePrivacy?.(node.folder.id, node.folder.privacyLevel || 'normal');
+                                }
+                            }}
+                        />
                     </div>
                 )}
             </div>
@@ -818,7 +803,7 @@ function FolderTreeNode({
             {hasChildren && isExpanded && (
                 <div>
                     {node.children.map(child => (
-                        <FolderTreeNode
+                        <IndexedFolderTreeNode
                             key={child.id}
                             node={child}
                             depth={depth + 1}
@@ -856,11 +841,11 @@ interface FileRowProps {
 function FileRow({ file, mode, onSelect, onOpen, onIndex, onUnindex, onTogglePrivacy, onExtractMemory, onPauseMemory }: FileRowProps) {
     const typeConfig = getFileTypeConfig(file.kind || 'other');
     const Icon = typeConfig.icon;
-    const isProcessing = mode === 'processing';
-    const isFast = mode === 'fast';
+    const isProcessing = mode.endsWith('_processing');
+    const isSemanticDone = mode === 'semantic_done';
     const isPrivate = file.privacyLevel === 'private';
     const hasMemory = file.memoryStatus === 'extracted';
-    const canStartMemory = mode !== 'pending' && mode !== 'processing';  // File is indexed
+    const canStartMemory = mode !== 'none' && !mode.endsWith('_processing');  // File is indexed
 
     return (
         <div
@@ -922,8 +907,8 @@ function FileRow({ file, mode, onSelect, onOpen, onIndex, onUnindex, onTogglePri
                         { label: 'Open File', value: 'open', icon: ExternalLink },
                         ...(isProcessing ? [] : [
                             { label: 'Fast Index', value: 'fast', icon: Zap },
-                            // Show "Deep Index" for fast-indexed files, "Deep Index" otherwise
-                            ...(isFast
+                            // Show "Deep Index" for semantic-indexed files
+                            ...(isSemanticDone
                                 ? [{ label: 'Deep Index', value: 'deep', icon: ArrowUp }]
                                 : [{ label: 'Deep Index', value: 'deep', icon: Eye }]
                             ),
@@ -933,7 +918,7 @@ function FileRow({ file, mode, onSelect, onOpen, onIndex, onUnindex, onTogglePri
                             value: 'toggle-privacy', 
                             icon: isPrivate ? ShieldOff : Shield 
                         },
-                        ...(onUnindex && mode !== 'none' && mode !== 'processing' ? [
+                        ...(onUnindex && mode !== 'none' && !mode.endsWith('_processing') ? [
                             { label: 'Unindex', value: 'unindex', icon: Trash2 },
                         ] : []),
                     ]}
@@ -1052,6 +1037,7 @@ export function IndexedFilesPanel({
     const [isAddingFile, setIsAddingFile] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
+    const [folderToDelete, setFolderToDelete] = useState<{ id: string, name: string } | null>(null);
     const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(['root']));
     const [filterType, setFilterType] = useState<FilterType>('all');
     // Map file path to its processing stage
@@ -1379,14 +1365,14 @@ export function IndexedFilesPanel({
                             </p>
                         </div>
                     ) : (
-                        <FolderTreeNode
+                        <IndexedFolderTreeNode
                             node={folderTree}
                             depth={0}
                             isSelected={selectedNode?.id === folderTree.id}
                             expandedNodes={expandedNodes}
                             onSelect={setSelectedNode}
                             onToggle={handleToggleNode}
-                            onRemove={onRemoveFolder}
+                            onRemove={(id, name) => setFolderToDelete({ id, name })}
                             onIndexAll={(folderId, mode) => onReindexFolder(folderId, mode)}
                             onTogglePrivacy={handleToggleFolderPrivacy}
                         />
@@ -1560,6 +1546,25 @@ export function IndexedFilesPanel({
                     )}
                 </div>
             </div>
+
+            <ConfirmModal
+                isOpen={!!folderToDelete}
+                title="Remove Folder?"
+                message={
+                    <>
+                        Are you sure you want to remove <span className="text-foreground font-semibold">&ldquo;{folderToDelete?.name}&rdquo;</span>? 
+                        This will remove all indexed files in this folder from your knowledge base.
+                    </>
+                }
+                confirmText="Remove"
+                cancelText="Keep it"
+                onClose={() => setFolderToDelete(null)}
+                onConfirm={() => {
+                    if (folderToDelete) {
+                        onRemoveFolder(folderToDelete.id);
+                    }
+                }}
+            />
         </div>
     );
 }
