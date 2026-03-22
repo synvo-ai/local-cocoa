@@ -47,23 +47,31 @@ export function MailPluginMain({
         const api = (window as any).api;
         if (!api?.runStagedIndex) return;
         try {
+            const account = emailAccounts.find((item) => item.folderId === folderId);
+            if (account) {
+                await handleSyncEmailAccount(account.id);
+            }
             await api.runStagedIndex({ folders: [folderId] });
             await refreshData();
         } catch (error) {
             console.error('Failed to rescan email index', error);
         }
-    }, [refreshData]);
+    }, [emailAccounts, handleSyncEmailAccount, refreshData]);
 
     const handleReindexEmailIndex = useCallback(async (folderId: string) => {
         const api = (window as any).api;
         if (!api?.runStagedIndex) return;
         try {
-            await api.runStagedIndex({ folders: [folderId] });
+            const account = emailAccounts.find((item) => item.folderId === folderId);
+            if (account) {
+                await handleSyncEmailAccount(account.id);
+            }
+            await api.runStagedIndex({ folders: [folderId], mode: 'reindex' });
             await refreshData();
         } catch (error) {
             console.error('Failed to reindex email index', error);
         }
-    }, [refreshData]);
+    }, [emailAccounts, handleSyncEmailAccount, refreshData]);
 
     const subTabs = [
         { id: 'accounts' as const, label: 'Email Accounts', icon: Mail },

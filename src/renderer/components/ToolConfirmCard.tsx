@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CheckCircle2, XCircle, Mail, FileEdit, Loader2, AlertTriangle } from 'lucide-react';
 import type { EmailAccountOption, ToolCallInfo } from '../types';
 import { cn } from '../lib/utils';
+import MarkdownEditor from './MarkdownEditor';
 
 const TOOL_META: Record<string, { icon: typeof Mail; label: string; color: string }> = {
     send_email: { icon: Mail, label: 'Send Email', color: 'text-blue-500' },
@@ -167,10 +168,11 @@ export function ToolConfirmCard({ toolCall, onConfirm, onCancel }: ToolConfirmCa
 
                     <label className="grid gap-1.5">
                         <span className="font-medium text-foreground">Body</span>
-                        <textarea
+                        <MarkdownEditor
                             value={draft.body}
-                            onChange={(event) => setDraft(prev => ({ ...prev, body: event.target.value }))}
-                            className="min-h-32 rounded-lg border bg-background px-3 py-3 text-sm whitespace-pre-wrap shadow-sm"
+                            onChange={(md) => setDraft(prev => ({ ...prev, body: md }))}
+                            placeholder="Email body..."
+                            minHeight="8rem"
                         />
                     </label>
                 </div>

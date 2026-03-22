@@ -4,6 +4,7 @@ import { StickyNote, Plus, Trash2, RefreshCw, Database, Save, Edit, Eye, Search,
 import { cn } from '@/renderer/lib/utils';
 import type { IndexingItem } from '@/renderer/types';
 import type { NoteContent, NoteSummary } from '../types';
+import MarkdownEditor from '@/renderer/components/MarkdownEditor';
 
 interface NotesWorkspaceProps {
     notes: NoteSummary[];
@@ -231,11 +232,12 @@ export function NotesWorkspace({
                             ) : null}
 
                             {mode === 'edit' ? (
-                                <textarea
+                                <MarkdownEditor
                                     value={localBody}
-                                    onChange={(e) => setLocalBody(e.target.value)}
-                                    className="w-full h-full resize-none bg-transparent p-6 text-sm outline-none font-mono leading-relaxed overflow-y-auto"
+                                    onChange={setLocalBody}
                                     placeholder="Start writing..."
+                                    minHeight="100%"
+                                    className="w-full h-full rounded-none border-0 shadow-none"
                                 />
                             ) : (
                                 <div className="h-full overflow-y-auto p-8 prose prose-sm dark:prose-invert max-w-none">

@@ -982,3 +982,108 @@ label,
 .empty-state-icon {
     animation: empty-state-float 3s ease-in-out infinite;
 }
+
+/* ——————————————————————————————————————————
+   MarkdownEditor (Tiptap) content styles
+   Target: .markdown-editor-content .tiptap (= ProseMirror div)
+—————————————————————————————————————————— */
+.markdown-editor-content .tiptap {
+    padding: 0.75rem;
+    min-height: inherit;
+    outline: none;
+    font-size: 0.875rem;
+    line-height: 1.625;
+    color: hsl(var(--foreground));
+}
+
+/* Placeholder */
+.markdown-editor-content .tiptap p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: hsl(var(--muted-foreground));
+    float: left;
+    height: 0;
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* Headings */
+.markdown-editor-content .tiptap h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0.75rem 0 0.5rem;
+    line-height: 1.3;
+}
+.markdown-editor-content .tiptap h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0.75rem 0 0.4rem;
+    line-height: 1.3;
+}
+.markdown-editor-content .tiptap h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0.6rem 0 0.3rem;
+    line-height: 1.3;
+}
+
+/* Paragraph spacing */
+.markdown-editor-content .tiptap p {
+    margin: 0 0 0.4rem;
+}
+.markdown-editor-content .tiptap p:last-child {
+    margin-bottom: 0;
+}
+
+/* Bold / Italic / Strike */
+.markdown-editor-content .tiptap strong { font-weight: 700; }
+.markdown-editor-content .tiptap em     { font-style: italic; }
+.markdown-editor-content .tiptap s      { text-decoration: line-through; opacity: 0.7; }
+
+/* Code (inline) */
+.markdown-editor-content .tiptap code {
+    background: hsl(var(--muted));
+    border-radius: 3px;
+    padding: 0.1em 0.35em;
+    font-size: 0.82em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Code block */
+.markdown-editor-content .tiptap pre {
+    background: hsl(var(--muted));
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    overflow-x: auto;
+    margin: 0.5rem 0;
+}
+.markdown-editor-content .tiptap pre code {
+    background: none;
+    padding: 0;
+    font-size: 0.82em;
+}
+
+/* Blockquote */
+.markdown-editor-content .tiptap blockquote {
+    border-left: 3px solid hsl(var(--border));
+    margin: 0.5rem 0;
+    padding: 0.25rem 0 0.25rem 0.75rem;
+    color: hsl(var(--muted-foreground));
+    font-style: italic;
+}
+
+/* Lists */
+.markdown-editor-content .tiptap ul,
+.markdown-editor-content .tiptap ol {
+    margin: 0.25rem 0 0.5rem;
+    padding-left: 1.5rem;
+}
+.markdown-editor-content .tiptap ul { list-style-type: disc; }
+.markdown-editor-content .tiptap ol { list-style-type: decimal; }
+.markdown-editor-content .tiptap li { margin: 0.15rem 0; }
+
+/* HR */
+.markdown-editor-content .tiptap hr {
+    border: none;
+    border-top: 1px solid hsl(var(--border));
+    margin: 0.75rem 0;
+}

@@ -1122,6 +1122,7 @@ export async function addChatMessage(sessionId: string, message: Partial<Convers
     const body = {
         role: message.role,
         content: message.text,
+        timestamp: message.timestamp,
         meta: message.meta,
         references: message.references,
         // Multi-path thinking steps

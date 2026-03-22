@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import { Loader2, FileText, ExternalLink, Eye, ChevronDown, ChevronRight, Layers, Search, StickyNote, Plus, Trash2, Save, ArrowLeft, Check } from 'lucide-react';
 import type { SearchHit, NoteSummary, NoteContent } from '../types';
 import { cn } from '../lib/utils';
+import MarkdownEditor, { type MarkdownEditorHandle } from './MarkdownEditor';
 
 // Grouped file result with all its chunks
 interface FileGroup {
@@ -167,7 +168,7 @@ export function QuickSearchPalette({
     resumeToken: _resumeToken
 }: QuickSearchPaletteProps) {
     const inputRef = useRef<HTMLInputElement | null>(null);
-    const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+    const editorRef = useRef<MarkdownEditorHandle | null>(null);
     const [hoveredHit, setHoveredHit] = useState<SearchHit | null>(null);
     const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
     const [elapsedTime, setElapsedTime] = useState(0);
@@ -179,7 +180,6 @@ export function QuickSearchPalette({
         let interval: NodeJS.Timeout;
         if (isSearching) {
             const startTime = Date.now();
-            setElapsedTime(0);
             interval = setInterval(() => {
                 setElapsedTime(Date.now() - startTime);
             }, 50); // Update frequently for smooth fractions
@@ -195,10 +195,14 @@ export function QuickSearchPalette({
     // Sync editing state when selected note changes
     useEffect(() => {
         if (selectedNote) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setEditingTitle(selectedNote.title || '');
+             
             setEditingBody(selectedNote.markdown || '');
         } else {
+             
             setEditingTitle('');
+             
             setEditingBody('');
         }
     }, [selectedNote]);
@@ -215,6 +219,7 @@ export function QuickSearchPalette({
 
         // Don't auto-save if no note selected or content hasn't changed
         if (!selectedNote?.id) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setAutoSaveStatus('idle');
             return;
         }
@@ -223,6 +228,7 @@ export function QuickSearchPalette({
             editingBody !== (selectedNote.markdown || '');
 
         if (!hasChanges) {
+             
             setAutoSaveStatus('idle');
             return;
         }
@@ -248,6 +254,7 @@ export function QuickSearchPalette({
     // Update auto-save status when save completes
     useEffect(() => {
         if (!isNoteSaving && autoSaveStatus === 'saving') {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setAutoSaveStatus('saved');
             // Reset to idle after showing "saved" briefly
             const timer = setTimeout(() => setAutoSaveStatus('idle'), 2000);
@@ -255,10 +262,10 @@ export function QuickSearchPalette({
         }
     }, [isNoteSaving, autoSaveStatus]);
 
-    // Focus textarea when editing a note
+    // Focus rich-text editor when editing a note
     useEffect(() => {
-        if (activeTab === 'notes' && selectedNote && textareaRef.current) {
-            textareaRef.current.focus();
+        if (activeTab === 'notes' && selectedNote) {
+            editorRef.current?.focus();
         }
     }, [activeTab, selectedNote]);
 
@@ -922,12 +929,13 @@ export function QuickSearchPalette({
 
                                     {/* Editor Body */}
                                     <div className="flex-1 min-h-0 px-6 py-4">
-                                        <textarea
-                                            ref={textareaRef}
+                                        <MarkdownEditor
+                                            ref={editorRef}
                                             value={editingBody}
-                                            onChange={(e) => setEditingBody(e.target.value)}
+                                            onChange={setEditingBody}
                                             placeholder="Start writing..."
-                                            className="w-full h-full min-h-[300px] resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground leading-relaxed"
+                                            minHeight="300px"
+                                            className="border-0 shadow-none rounded-none"
                                             onKeyDown={(e) => {
                                                 if ((e.metaKey || e.ctrlKey) && e.key === 's') {
                                                     e.preventDefault();
