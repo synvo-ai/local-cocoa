@@ -40,7 +40,7 @@ import {
     Pause,
     RefreshCw,
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, getShowInExplorerLabel } from '../lib/utils';
 import { ConfirmModal } from './modals/ConfirmModal';
 import type { FolderRecord, IndexedFile, IndexingItem, PrivacyLevel, MemoryStatus } from '../types';
 
@@ -606,7 +606,7 @@ function ActionDropdown({
             </button>
             {isOpen && (
                 <div className={cn(
-                    "absolute right-0 z-[9999] min-w-[160px] rounded-xl border bg-popover p-1.5 shadow-lg",
+                    "absolute right-0 z-[9999] min-w-[170px] rounded-xl border bg-popover p-1.5 shadow-lg",
                     openUpward ? "bottom-full mb-1" : "top-full mt-1"
                 )}>
                     {options.map((option) => {
@@ -782,6 +782,7 @@ function IndexedFolderTreeNode({
                                     value: 'toggle-privacy', 
                                     icon: node.folder?.privacyLevel === 'private' ? ShieldOff : Shield 
                                 },
+                                { label: getShowInExplorerLabel(), value: 'reveal', icon: Folder },
                                 { label: 'Remove Folder', value: 'remove', icon: Trash2, destructive: true },
                             ]}
                             onSelect={(value) => {
@@ -792,6 +793,8 @@ function IndexedFolderTreeNode({
                                     onIndexAll?.(node.folder.id, value);
                                 } else if (value === 'toggle-privacy' && node.folder) {
                                     onTogglePrivacy?.(node.folder.id, node.folder.privacyLevel || 'normal');
+                                } else if (value === 'reveal' && node.folder) {
+                                    window.api.showInFolder(node.folder.path);
                                 }
                             }}
                         />
@@ -865,7 +868,12 @@ function FileRow({ file, mode, onSelect, onOpen, onIndex, onUnindex, onTogglePri
 
             {/* File name - takes most space, minimum 200px */}
             <div className="flex-1 min-w-[200px] flex items-center gap-2">
-                <p className="text-sm truncate" title={file.name}>{file.name}</p>
+                <p 
+                    className="text-sm truncate" 
+                    title={String(file.metadata?.title || file.name)}
+                >
+                    {String(file.metadata?.title || file.name)}
+                </p>
                 {isPrivate && (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-medium shrink-0">
                         <Lock className="h-2.5 w-2.5" />
@@ -919,8 +927,11 @@ function FileRow({ file, mode, onSelect, onOpen, onIndex, onUnindex, onTogglePri
                             icon: isPrivate ? ShieldOff : Shield 
                         },
                         ...(onUnindex && mode !== 'none' && !mode.endsWith('_processing') ? [
+                            { label: getShowInExplorerLabel(), value: 'reveal', icon: Folder },
                             { label: 'Unindex', value: 'unindex', icon: Trash2 },
-                        ] : []),
+                        ] : [
+                            { label: getShowInExplorerLabel(), value: 'reveal', icon: Folder },
+                        ]),
                     ]}
                     onSelect={(value) => {
                         if (value === 'open') onOpen();
@@ -930,6 +941,9 @@ function FileRow({ file, mode, onSelect, onOpen, onIndex, onUnindex, onTogglePri
                             onTogglePrivacy?.(file.id, file.privacyLevel || 'normal');
                         }
                         else if (value === 'unindex') onUnindex?.();
+                        else if (value === 'reveal') {
+                            window.api.showInFolder(file.fullPath);
+                        }
                     }}
                 />
             </div>

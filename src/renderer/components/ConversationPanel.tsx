@@ -9,6 +9,7 @@ import { RecalledContext, getReferenceLabel } from './ReferenceContext';
 import { ToolConfirmCard, ToolCallBadges } from './ToolConfirmCard';
 import { useSkin } from './skin-provider';
 import { cn } from '../lib/utils';
+import { CopyButton } from './CopyButton';
 import cocoaMascot from '../assets/cocoa-mascot.png';
 import cocoaBranchLeft from '../assets/cocoa-branch-left.png';
 import cocoaBranchRight from '../assets/cocoa-branch-right.png';
@@ -46,6 +47,7 @@ export interface AgentContext {
     latencyMs?: number | null;
     status?: 'idle' | 'pending' | 'ok' | 'error';
 }
+
 
 interface ConversationPanelProps {
     messages: ConversationMessage[];
@@ -507,7 +509,7 @@ export function ConversationPanel({
                         const hideMessageBubble = hasConfirmationCards && (!normalizedText || allToolsResolved);
 
                         return (
-                            <div key={messageKey} className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+                            <div key={messageKey} className={cn("flex group", isUser ? "justify-end" : "justify-start")}>
                                 <div className={cn("max-w-[85%] space-y-2", isUser ? "items-end" : "items-start")}>
 
                                     {!isUser && message.steps && message.steps.length > 0 && (
@@ -597,22 +599,33 @@ export function ConversationPanel({
                                     ))}
 
                                     {!hideMessageBubble && (
-                                        <div
-                                            className={cn(
-                                                "rounded-2xl px-5 py-3.5 text-sm leading-relaxed shadow-sm",
-                                                isUser
-                                                    ? "bg-primary text-primary-foreground"
-                                                    : "bg-muted/50 text-foreground border"
-                                            )}
-                                        >
-                                            {!isUser && !message.text && message.meta ? (
-                                                <div className="flex items-center gap-2 py-1">
-                                                    <LoadingDots label={message.meta} />
+                                        <>
+                                            {message.text && (
+                                                <div className="flex justify-end mb-1 opacity-0 group-hover:opacity-100 transition-opacity pr-1">
+                                                    <CopyButton 
+                                                        text={message.text} 
+                                                        className="bg-transparent border-none shadow-none p-1 h-auto text-muted-foreground hover:text-foreground"
+                                                        iconSize={13}
+                                                    />
                                                 </div>
-                                            ) : (
-                                                renderMessageText(message.text, message.references)
                                             )}
-                                        </div>
+                                            <div
+                                                className={cn(
+                                                    "rounded-2xl px-5 py-3.5 text-sm leading-relaxed shadow-sm",
+                                                    isUser
+                                                        ? "bg-primary text-primary-foreground"
+                                                        : "bg-muted/50 text-foreground border"
+                                                )}
+                                            >
+                                                {!isUser && !message.text && message.meta ? (
+                                                    <div className="flex items-center gap-2 py-1">
+                                                        <LoadingDots label={message.meta} />
+                                                    </div>
+                                                ) : (
+                                                    renderMessageText(message.text, message.references)
+                                                )}
+                                            </div>
+                                        </>
                                     )}
 
                                     {!isUser && !hideMessageBubble && message.meta && message.text && (

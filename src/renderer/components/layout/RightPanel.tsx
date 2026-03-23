@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { X, FileText, ExternalLink, Activity, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Shield, ShieldOff, Maximize2, Loader2, Scan } from 'lucide-react';
 import type { IndexedFile, SearchHit, IndexProgressUpdate, IndexingItem, PrivacyLevel, SystemResourceStatus } from '../../types';
-import type { StagedIndexProgress } from '../../../electron/backendClient';
+import type { StagedIndexProgress } from '../../../main/backendClient';
 import type { EtaEstimate } from '../../hooks/useEtaEstimator';
+import { cn } from '../../lib/utils';
 import { IndexProgressPanel } from '../IndexProgressPanel';
 
 interface RightPanelProps {
@@ -143,6 +144,7 @@ export function RightPanel({
     const pdfContainerRef = useRef<HTMLDivElement>(null);
     const pdfImageRef = useRef<HTMLImageElement>(null);
     const [imgBounds, setImgBounds] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+    const [isPreviewRendered, setIsPreviewRendered] = useState(true);
 
     interface FileChunkSnapshot {
         chunk_id: string;
@@ -1125,9 +1127,33 @@ export function RightPanel({
 
                         {(selectedHit || activeChunk) && (selectedHit?.snippet || activeChunk?.snippet || fullContext || activeChunk?.text || pageText) && (
                             <div className="space-y-2">
-                                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                    {isPdf ? `Page ${pageNumber} Content` : 'Relevant Content'}
-                                </h4>
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                        {isPdf ? `Page ${pageNumber} Content` : 'Relevant Content'}
+                                    </h4>
+                                    <div className="flex items-center gap-1 rounded-md border bg-muted/30 p-0.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsPreviewRendered(false)}
+                                            className={cn(
+                                                "rounded px-1.5 py-0.5 text-[10px] font-medium transition-all duration-200",
+                                                !isPreviewRendered ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            Raw
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsPreviewRendered(true)}
+                                            className={cn(
+                                                "rounded px-1.5 py-0.5 text-[10px] font-medium transition-all duration-200",
+                                                isPreviewRendered ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            Rendered
+                                        </button>
+                                    </div>
+                                </div>
                                 {chunksLoading && (
                                     <p className="text-[11px] text-muted-foreground">Loading chunks…</p>
                                 )}
@@ -1192,17 +1218,37 @@ export function RightPanel({
                                                             Chunk {chunk.ordinal + 1}
                                                         </span>
                                                     </div>
-                                                    <p className="whitespace-pre-wrap font-serif text-foreground/90 text-sm">
-                                                        {chunk.text || chunk.snippet}
-                                                    </p>
+                                                    <div className="font-serif text-foreground/90 text-sm">
+                                                        {isPreviewRendered ? (
+                                                            <div 
+                                                                className="rendered-html break-words"
+                                                                dangerouslySetInnerHTML={{ __html: chunk.text || chunk.snippet }}
+                                                            />
+                                                        ) : (
+                                                            <p className="whitespace-pre-wrap">{chunk.text || chunk.snippet}</p>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             ))
                                         ) : (
-                                            <p className="whitespace-pre-wrap font-serif text-foreground/90 text-sm">
-                                                {showFullContext && fullContext
-                                                    ? fullContext
-                                                    : activeChunk?.snippet ?? activeChunk?.text ?? selectedHit?.snippet ?? fullContext}
-                                            </p>
+                                            <div className="font-serif text-foreground/90 text-sm">
+                                                {isPreviewRendered ? (
+                                                    <div 
+                                                        className="rendered-html break-words"
+                                                        dangerouslySetInnerHTML={{ 
+                                                            __html: showFullContext && fullContext
+                                                                ? fullContext
+                                                                : activeChunk?.snippet ?? activeChunk?.text ?? selectedHit?.snippet ?? fullContext ?? ''
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <p className="whitespace-pre-wrap">
+                                                        {showFullContext && fullContext
+                                                            ? fullContext
+                                                            : activeChunk?.snippet ?? activeChunk?.text ?? selectedHit?.snippet ?? fullContext}
+                                                    </p>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </div>

@@ -5,7 +5,7 @@ import { cn } from '../lib/utils';
 
 export function getReferenceLabel(reference: SearchHit): { name: string; location: string } {
     const metadata = reference.metadata ?? {};
-    const name = (metadata.file_name || metadata.name || metadata.filename || metadata.title) as string | undefined;
+    const name = (metadata.title || metadata.subject || metadata.file_name || metadata.name || metadata.filename) as string | undefined;
     const location = (metadata.path || metadata.file_path || metadata.full_path || '') as string | undefined;
 
     if (name && location) {

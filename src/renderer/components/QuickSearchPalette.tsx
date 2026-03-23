@@ -21,7 +21,7 @@ function groupHitsByFile(hits: SearchHit[]): FileGroup[] {
     for (const hit of hits) {
         const fileId = hit.fileId;
         const metadata = hit.metadata ?? {};
-        const fileName = String(metadata.name || metadata.file_name || metadata.filename || metadata.title || 'Untitled');
+        const fileName = String(metadata.title || metadata.subject || metadata.name || metadata.file_name || metadata.filename || 'Untitled');
         const filePath = String(metadata.path || metadata.file_path || metadata.full_path || '');
 
         if (!groups.has(fileId)) {
@@ -49,7 +49,7 @@ function groupHitsByFile(hits: SearchHit[]): FileGroup[] {
 
 function getReferenceLabel(reference: SearchHit): { name: string; location: string } {
     const metadata = reference.metadata ?? {};
-    const name = (metadata.file_name || metadata.name || metadata.filename || metadata.title) as string | undefined;
+    const name = (metadata.title || metadata.subject || metadata.file_name || metadata.name || metadata.filename) as string | undefined;
     const location = (metadata.path || metadata.file_path || metadata.full_path || '') as string | undefined;
 
     if (name && location) {

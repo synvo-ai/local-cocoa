@@ -299,7 +299,9 @@ export function FolderExplorer({
                                         className={`w-full rounded-lg border px-3 py-2 text-left text-xs transition ${variantClass}`}
                                     >
                                         <div className="flex items-center justify-between gap-3">
-                                            <p className="truncate text-sm font-semibold text-white/90">{node.name}</p>
+                                            <p className="truncate text-sm font-semibold text-white/90">
+                                                {String(file.metadata?.title || file.metadata?.subject || node.name)}
+                                            </p>
                                             <div className="flex items-center gap-2">
                                                 <span className="text-[10px] uppercase tracking-wide text-slate-300">.{file.extension}</span>
                                                 <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badgeClass}`}>

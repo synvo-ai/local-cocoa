@@ -31,6 +31,10 @@ function formatRecipientList(recipients: string[]): string {
     return `${recipients[0]} +${recipients.length - 1}`;
 }
 
+function getToRecipients(message: EmailMessageSummary): string[] {
+    return message.to && message.to.length > 0 ? message.to : message.recipients;
+}
+
 export function EmailMessageViewer({
     accounts,
     syncStates,
@@ -155,7 +159,7 @@ export function EmailMessageViewer({
                                                 {message.subject?.trim() || 'Untitled email'}
                                             </p>
                                             <p className="text-[11px] text-slate-300/70">
-                                                {message.sender ?? 'Unknown sender'} · {formatRecipientList(message.recipients)}
+                                                {message.sender ?? 'Unknown sender'} · {formatRecipientList(getToRecipients(message))}
                                             </p>
                                             <p className="text-[11px] text-slate-400/70">{sentLabel}</p>
                                             <p className="mt-2 line-clamp-2 text-xs text-slate-200/80">{preview}</p>
@@ -194,8 +198,21 @@ export function EmailMessageViewer({
                                 {messageContent.subject?.trim() || 'Untitled email'}
                             </p>
                             <p className="mt-1 text-[11px] text-slate-300/80">
-                                From {messageContent.sender ?? 'Unknown sender'} · To {formatRecipientList(messageContent.recipients)}
+                                From {messageContent.sender ?? 'Unknown sender'}
                             </p>
+                            <p className="text-[11px] text-slate-300/80">
+                                To: {formatRecipientList(getToRecipients(messageContent))}
+                            </p>
+                            {messageContent.cc && messageContent.cc.length > 0 ? (
+                                <p className="text-[11px] text-slate-300/80">
+                                    CC: {messageContent.cc.join(', ')}
+                                </p>
+                            ) : null}
+                            {messageContent.bcc && messageContent.bcc.length > 0 ? (
+                                <p className="text-[11px] text-slate-300/80">
+                                    BCC: {messageContent.bcc.join(', ')}
+                                </p>
+                            ) : null}
                             <p className="text-[11px] text-slate-400/80">
                                 {messageContent.sentAt ? new Date(messageContent.sentAt).toLocaleString() : 'Unknown date'}
                             </p>

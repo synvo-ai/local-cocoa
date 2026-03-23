@@ -642,6 +642,57 @@ label,
     color: #e8d4bc;
 }
 
+/* Rendered HTML Styling */
+.rendered-html {
+    line-height: 1.6;
+}
+
+.rendered-html h1, .rendered-html h2, .rendered-html h3, .rendered-html h4 {
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+}
+
+.rendered-html p {
+    margin-bottom: 0.75em;
+}
+
+.rendered-html ul, .rendered-html ol {
+    margin-left: 1.25em;
+    margin-bottom: 0.75em;
+    list-style-type: disc;
+}
+
+.rendered-html ol {
+    list-style-type: decimal;
+}
+
+.rendered-html a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+}
+
+.rendered-html code {
+    background-color: hsl(var(--muted));
+    padding: 0.2em 0.4em;
+    border-radius: 0.3em;
+    font-size: 0.9em;
+}
+
+.rendered-html pre {
+    background-color: hsl(var(--muted));
+    padding: 1em;
+    border-radius: 0.5em;
+    overflow-x: auto;
+    margin-bottom: 0.75em;
+}
+
+.rendered-html img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5em;
+}
+
 /* ============================================
    Welcome Setup Animations
    ============================================ */

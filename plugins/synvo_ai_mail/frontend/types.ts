@@ -60,6 +60,9 @@ export interface EmailMessageSummary {
     subject?: string | null;
     sender?: string | null;
     recipients: string[];
+    to?: string[];
+    cc?: string[];
+    bcc?: string[];
     sentAt?: string | null;
     storedPath: string;
     size: number;

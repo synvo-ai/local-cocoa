@@ -48,7 +48,9 @@ export function FileList({ files, onSelectFile, className, emptyState }: FileLis
                             <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide ${kindBadge[file.kind] ?? kindBadge.other}`}>
                                 {file.kind}
                             </span>
-                            <p className="text-sm font-semibold text-white/90 truncate max-w-[220px] md:max-w-[320px]">{file.name}</p>
+                            <p className="text-sm font-semibold text-white/90 truncate max-w-[220px] md:max-w-[320px]">
+                                {String(file.metadata?.title || file.metadata?.subject || file.name)}
+                            </p>
                         </div>
                         <p className="mt-1 text-xs text-slate-300/80">
                             {file.location} · {readableSize(file.size)} · Last modified {new Date(file.modifiedAt).toLocaleString()}

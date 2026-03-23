@@ -805,6 +805,7 @@ contextBridge.exposeInMainWorld('env', {
     LOG_LEVEL: process.env.LOG_LEVEL,
     APP_VERSION: process.env.APP_VERSION,
     APP_NAME: process.env.APP_NAME,
+    PLATFORM: process.platform,
 });
 
 declare global {

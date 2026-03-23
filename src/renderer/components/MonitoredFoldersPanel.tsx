@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { Folder, Plus, Trash2, AlertTriangle, Info, ChevronDown, ChevronUp, FileText, Clock, ArrowUp } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, getShowInExplorerLabel } from '../lib/utils';
 import { ConfirmModal } from './modals/ConfirmModal';
 import type { FolderRecord, IndexingItem, IndexedFile } from '../types';
 
@@ -79,7 +79,7 @@ function IndexDropdown({
             </button>
             {isOpen && (
                 <div className={cn(
-                    "absolute right-0 z-50 min-w-[140px] rounded-md border bg-popover p-1 shadow-md",
+                    "absolute right-0 z-50 min-w-[170px] rounded-md border bg-popover p-1 shadow-md",
                     openUpward ? "bottom-full mb-1" : "top-full mt-1"
                 )}>
                     {options.map((option) => (
@@ -523,6 +523,16 @@ export function MonitoredFoldersPanel({
                                         {expandedFolderId === folder.id ? 'Hide Files' : 'Show Files'}
                                     </button>
                                     <div className="flex flex-wrap items-center gap-2">
+                                        {/* Show in Explorer button */}
+                                        <button
+                                            type="button"
+                                            onClick={() => window.api.showInFolder(folder.path)}
+                                            className="inline-flex items-center justify-center rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+                                        >
+                                            <Folder className="mr-2 h-3.5 w-3.5" />
+                                            {getShowInExplorerLabel().replace('Open ', '')}
+                                        </button>
+                                        
                                         {/* Index All dropdown button */}
                                         <IndexDropdown
                                             label={`Index All (${resolveMode(folder.id) === 'fast' ? 'Fast' : 'Deep'})`}
@@ -652,13 +662,21 @@ export function MonitoredFoldersPanel({
                                                                     <IndexDropdown
                                                                         label={needsIndex ? (isError ? 'Retry' : 'Index') : 'Reindex'}
                                                                         options={needsIndex ? [
+                                                                            { label: getShowInExplorerLabel(), value: 'reveal' },
                                                                             { label: 'Fast Index', value: 'fast' },
                                                                             { label: 'Deep Index', value: 'deep' }
                                                                         ] : [
+                                                                            { label: getShowInExplorerLabel(), value: 'reveal' },
                                                                             { label: 'Fast Reindex', value: 'fast' },
                                                                             { label: 'Deep Reindex', value: 'deep' }
                                                                         ]}
-                                                                        onSelect={(value) => handleFileIndex(file.fullPath, value as 'fast' | 'deep')}
+                                                                        onSelect={(value) => {
+                                                                            if (value === 'reveal') {
+                                                                                window.api.showInFolder(file.fullPath);
+                                                                            } else {
+                                                                                handleFileIndex(file.fullPath, value as 'fast' | 'deep');
+                                                                            }
+                                                                        }}
                                                                         variant="small"
                                                                     />
                                                                 )}
